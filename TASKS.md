@@ -1,4 +1,4 @@
-# TASKS.md — Agent A (Backend, Engine & AI Layer)
+# TASKS.md — Agent B (Frontend)
 
 > Start here. Read CLAUDE.md first for full project context, architecture rules, and the Golden Rule.
 > This file is your step-by-step build plan. Work top to bottom. Commit at each checkpoint.
@@ -7,291 +7,301 @@
 
 ## Your Ownership
 
-| Package / App | Your responsibility |
+| Package | Your responsibility |
 |---|---|
-| `packages/shared` | Define and publish all shared TypeScript types |
-| `packages/engine` | Deterministic tax calculator — all math lives here |
-| `packages/ai-layer` | Claude integration — extractor and explainer only |
-| `apps/api` | Fastify HTTP server exposing 3 endpoints |
+| `packages/frontend` | Everything the user sees — React app, components, API calls |
 
-**Do NOT touch `packages/frontend`.** That is Agent B's territory.
+**Do NOT touch `packages/engine`, `packages/ai-layer`, or `apps/api`.** Those are Agent A's territory.
 
 ---
 
 ## Integration Protocol
 
-You communicate with Agent B via **git signal commits**. Include the tag in your commit message:
+Agent A communicates readiness via **git signal commits** on `feature/backend`.
+Check for signals before starting any API-dependent work:
 
-| Tag | When to use |
-|---|---|
-| `[SIGNAL: shared-types-ready]` | After publishing `packages/shared` |
-| `[SIGNAL: calculate-ready]` | After `POST /api/calculate` is live and tested |
-| `[SIGNAL: extract-ready]` | After `POST /api/extract` is live |
-| `[SIGNAL: explain-ready]` | After `POST /api/explain` is live |
-
-To see what Agent B has shipped:
 ```bash
 git fetch origin
-git log origin/feature/frontend --oneline | grep SIGNAL
+git log origin/feature/backend --oneline | grep SIGNAL
 ```
 
-To pull Agent B's latest (e.g., to run integration tests):
+When you see a signal you need, pull Agent A's work:
 ```bash
-git merge origin/feature/frontend --no-edit
+git merge origin/feature/backend --no-edit
+```
+
+| Signal to watch for | What it means | Your action |
+|---|---|---|
+| `[SIGNAL: shared-types-ready]` | `packages/shared` is published | Replace your local `types.ts` copy with `import from '@taxai/shared'` |
+| `[SIGNAL: calculate-ready]` | `POST /api/calculate` is live on :3000 | Wire up `src/api/taxai.ts`, replace mock with live call |
+| `[SIGNAL: extract-ready]` | `POST /api/extract` is live | Build `ChatInput.tsx` |
+| `[SIGNAL: explain-ready]` | `POST /api/explain` is live | Build `ExplanationPanel.tsx` |
+
+To notify Agent A when your dashboard is ready:
+- Commit: `feat(frontend): ResultDashboard + WaterfallChart [SIGNAL: dashboard-ready]`
+
+---
+
+## Phase 0 — Bootstrap
+
+### Step 1 — Scaffold
+- [ ] From the monorepo root (one level up from this worktree), ensure `package.json` has workspaces configured. If Agent A hasn't created it yet, create it yourself:
+  ```json
+  { "private": true, "workspaces": ["packages/*", "apps/*"] }
+  ```
+- [ ] Create `packages/frontend/` using Vite:
+  ```bash
+  pnpm create vite packages/frontend --template react-ts
+  cd packages/frontend
+  ```
+- [ ] Update `packages/frontend/package.json` — set `"name": "@taxai/frontend"`
+- [ ] Install UI deps:
+  ```bash
+  pnpm add recharts
+  pnpm add -D tailwindcss @tailwindcss/vite
+  ```
+- [ ] Configure Tailwind: add `@tailwindcss/vite` plugin to `vite.config.ts`, add `@import "tailwindcss"` to `src/index.css`
+- [ ] Commit: `chore(frontend): Vite + React 18 + Tailwind + Recharts scaffold [Phase 0]`
+
+### Step 2 — Local types (temporary, until `[SIGNAL: shared-types-ready]`)
+Create `packages/frontend/src/types.ts` with a **verbatim copy** of the interfaces from CLAUDE.md section 5:
+- `TaxInput`, `SpanishRegion`, `CivilStatus`, `DisabilityGrade`, `TaxResult`, `WaterfallStep`
+
+**The moment Agent A commits `[SIGNAL: shared-types-ready]`:**
+1. Run `git merge origin/feature/backend --no-edit`
+2. Add `"@taxai/shared": "workspace:*"` to `packages/frontend/package.json` dependencies
+3. Delete `src/types.ts`
+4. Replace all `import ... from '../types'` with `import ... from '@taxai/shared'`
+5. Run `pnpm install`
+
+### Step 3 — Mock data
+Create `packages/frontend/src/mocks/taxResult.ts`. Use this until the API is live:
+
+```typescript
+import type { TaxResult } from '../types'  // or '@taxai/shared' after signal
+
+export const MOCK_RESULT: TaxResult = {
+  fiscalYear: 2024,
+  region: 'madrid',
+  grossSalary: 35000,
+  rendimientoNetoReducido: 33000,
+  baseImponibleGeneral: 33000,
+  minimumPersonalFamiliar: 5550,
+  cuotaIntegraEstatal: 1669,
+  cuotaIntegraAutonomica: 1485,
+  cuotaIntegraTOTAL: 3154,
+  cuotaLiquidaEstatal: 1143,
+  cuotaLiquidaAutonomica: 960,
+  cuotaLiquidaTOTAL: 2103,
+  retenciones: 4200,
+  resultAmount: -2097,
+  resultType: 'a_devolver',
+  waterfallSteps: [
+    { label: 'Salario bruto', amount: 35000, runningTotal: 35000 },
+    { label: 'Reducción por trabajo', amount: -2000, runningTotal: 33000 },
+    { label: 'Cuota íntegra estatal', amount: 1669, runningTotal: 1669, bracketRate: 0.095 },
+    { label: 'Cuota íntegra autonómica (Madrid)', amount: 1485, runningTotal: 3154, bracketRate: 0.09 },
+    { label: 'Reducción mínimo personal', amount: -1051, runningTotal: 2103 },
+    { label: 'Retenciones a cuenta', amount: -4200, runningTotal: -2097 },
+  ],
+}
 ```
 
 ---
 
-## Phase 0 — Bootstrap & Shared Types
-> **Priority: unblock Agent B immediately. Do this before anything else.**
+## Phase 1 — Results Dashboard
+> **Do this before connecting any API. This is the core value proposition of the app.**
+> A user must understand their tax status within 5 seconds of seeing this screen.
 
-### Step 1 — Monorepo scaffold
-- [ ] Create `/.nvmrc` containing `20`
-- [ ] Create root `package.json`:
-  ```json
-  {
-    "name": "taxai",
-    "private": true,
-    "workspaces": ["packages/*", "apps/*"],
-    "scripts": {
-      "test": "pnpm -r test",
-      "dev:api": "pnpm --filter @taxai/api dev"
-    }
-  }
-  ```
-- [ ] Create `pnpm-workspace.yaml`:
-  ```yaml
-  packages:
-    - 'packages/*'
-    - 'apps/*'
-  ```
-- [ ] Create `tsconfig.base.json`:
-  ```json
-  {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "NodeNext",
-      "moduleResolution": "NodeNext",
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "resolveJsonModule": true
-    }
-  }
-  ```
-- [ ] Run `pnpm install`
-- [ ] Commit: `chore: monorepo scaffold [Phase 0]`
+### Step 4 — ResultDashboard.tsx
+Create `packages/frontend/src/components/ResultDashboard.tsx`:
 
-### Step 2 — packages/shared (Agent B is blocked until this is done)
-- [ ] Create `packages/shared/package.json`:
-  ```json
-  {
-    "name": "@taxai/shared",
-    "version": "0.1.0",
-    "main": "./src/index.ts",
-    "types": "./src/index.ts"
-  }
-  ```
-- [ ] Create `packages/shared/src/types.ts` with the **exact** interfaces from CLAUDE.md section 5:
-  - `TaxInput`
-  - `SpanishRegion` (all 17 autonomías)
-  - `CivilStatus`
-  - `DisabilityGrade`
-  - `TaxResult`
-  - `WaterfallStep`
-- [ ] Create `packages/shared/src/index.ts` that re-exports everything from `types.ts`
-- [ ] **Commit with signal:** `feat(shared): publish TaxInput, TaxResult, WaterfallStep types [SIGNAL: shared-types-ready]`
+- [ ] **Hero card** (top, full width on mobile):
+  - Large (text-5xl) euro amount: format `resultAmount` as `€2.097,00` (Spanish locale)
+  - Bold label: "A devolver" (green) or "A ingresar" (red)
+  - Use `resultType` to set `bg-green-50 border-green-400` or `bg-red-50 border-red-400`
+  - Subtext: `Declaración de la Renta {fiscalYear} · {region}` (capitalize region)
+
+- [ ] **Tax breakdown grid** (below hero, 2 cols on desktop, 1 on mobile):
+  - Salario bruto → `grossSalary`
+  - Rendimiento neto → `rendimientoNetoReducido`
+  - Mínimo personal y familiar → `minimumPersonalFamiliar`
+  - Cuota íntegra total → `cuotaIntegraTOTAL`
+  - Cuota líquida total → `cuotaLiquidaTOTAL`
+  - Retenciones → `retenciones`
+  - Each row: label on left, euro amount on right, monospace font for amounts
+
+- [ ] All euro amounts formatted with `Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })`
+
+### Step 5 — WaterfallChart.tsx
+Create `packages/frontend/src/components/WaterfallChart.tsx` using Recharts:
+
+- [ ] Use `BarChart` from Recharts
+- [ ] One bar per `WaterfallStep`
+- [ ] Bar color:
+  - `amount < 0` → `#16a34a` (green, reduces tax burden)
+  - `amount > 0` → `#dc2626` (red, adds to tax burden)
+- [ ] X-axis: `label` (rotate 30° if needed for readability)
+- [ ] Y-axis: euro amounts (pass `amount` directly — already in euros from API)
+- [ ] `Tooltip`: show `label`, `amount` formatted as euros, `bracketRate` as percentage if present
+- [ ] Responsive: wrap in `<ResponsiveContainer width="100%" height={320}>`
+
+### Step 6 — Compose and validate
+- [ ] Update `App.tsx` to import `MOCK_RESULT` and render `<ResultDashboard result={MOCK_RESULT} />` and `<WaterfallChart steps={MOCK_RESULT.waterfallSteps} />`
+- [ ] Run `pnpm dev` and open browser — verify it looks production-ready
+- [ ] Test at 375px width (mobile): hero card and chart must be readable
+- [ ] **Commit with signal:** `feat(frontend): ResultDashboard + WaterfallChart with mock data [SIGNAL: dashboard-ready]`
 
 ---
 
-## Phase 1 — Tax Engine (Madrid + Catalonia first)
+## Phase 1 — API Integration
+> **Wait for `[SIGNAL: calculate-ready]` from Agent A before this step.**
+> Check: `git fetch origin && git log origin/feature/backend --oneline | grep calculate-ready`
 
-### Step 3 — Tax rules JSON files
-Create these files exactly following the schema in CLAUDE.md section 7:
+### Step 7 — API client
+Create `packages/frontend/src/api/taxai.ts`:
 
-- [ ] `packages/engine/rules/2024/state.json` — 2024 state (estatal) brackets from CLAUDE.md section 9:
-  ```json
-  {
-    "region": "state",
-    "fiscalYear": 2024,
-    "stateBrackets": [
-      { "from": 0,      "to": 12450,  "rate": 0.095 },
-      { "from": 12450,  "to": 20200,  "rate": 0.12  },
-      { "from": 20200,  "to": 35200,  "rate": 0.15  },
-      { "from": 35200,  "to": 60000,  "rate": 0.185 },
-      { "from": 60000,  "to": 300000, "rate": 0.225 },
-      { "from": 300000, "to": null,   "rate": 0.245 }
-    ]
+```typescript
+import type { TaxInput, TaxResult } from '@taxai/shared'  // or local types.ts
+
+const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000'
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message ?? 'Error en el servidor. Inténtalo de nuevo.')
   }
-  ```
+  return res.json()
+}
 
-- [ ] `packages/engine/rules/2024/madrid.json`:
-  ```json
-  {
-    "region": "madrid",
-    "fiscalYear": 2024,
-    "autonomicBrackets": [
-      { "from": 0,      "to": 12450,  "rate": 0.09  },
-      { "from": 12450,  "to": 17707,  "rate": 0.09  },
-      { "from": 17707,  "to": 33007,  "rate": 0.12  },
-      { "from": 33007,  "to": 53407,  "rate": 0.14  },
-      { "from": 53407,  "to": null,   "rate": 0.17  }
-    ],
-    "trabajoReductions": {
-      "fullReductionThreshold": 14852,
-      "maxReduction": 5565,
-      "baseReduction": 2000,
-      "phaseOutStart": 14852,
-      "phaseOutEnd": 19747
-    }
-  }
-  ```
+export const taxai = {
+  calculate: (input: TaxInput) => post<TaxResult>('/api/calculate', input),
+  extract:   (message: string) => post<Partial<TaxInput>>('/api/extract', { message }),
+  explain:   (result: TaxResult, question: string) =>
+               post<{ explanation: string }>('/api/explain', { result, question }),
+}
+```
 
-- [ ] `packages/engine/rules/2024/catalonia.json` — research official 2024 Catalan autonomic brackets (top rate ~21.5% autonomic)
+Create `packages/frontend/.env.example`:
+```
+VITE_API_BASE=http://localhost:3000
+```
 
-### Step 4 — Engine implementation
-Create `packages/engine/package.json` with name `@taxai/engine`, dependencies on `@taxai/shared`.
+### Step 8 — InputForm.tsx
+Create `packages/frontend/src/components/InputForm.tsx`:
 
-Implement the 8-step calculation order from CLAUDE.md section 6:
+- [ ] One labeled field per required `TaxInput` property:
+  - **Comunidad Autónoma** → `<select>` with all 17 SpanishRegion values, labels in Spanish
+  - **Ejercicio fiscal** → number input, default 2024
+  - **Edad** → number input
+  - **Salario bruto anual (€)** → number input
+  - **Otros ingresos (€)** → number input, optional
+  - **Retenciones a cuenta (€)** → number input
+  - **Hijos/dependientes menores de 25** → number input, default 0
+  - **Dependientes mayores de 65** → number input, default 0
+  - **Estado civil** → `<select>`: Soltero/a, Casado/a, Viudo/a, Separado/a
+  - **Discapacidad** → `<select>`: Ninguna, 33%, 65%+
 
-- [ ] `packages/engine/src/reductions.ts` — Step 2: trabajo reductions
-  - If `grossSalary <= 14852`: full reduction = min(5565, grossSalary - otherIncome)
-  - If `14852 < grossSalary <= 19747`: linear phase-out between maxReduction and baseReduction
-  - If `grossSalary > 19747`: reduction = baseReduction (€2,000)
-  - Returns `rendimientoNetoReducido` in **cents**
+- [ ] Submit button: "Calcular mi declaración"
+- [ ] Loading state: disable button, show spinner
+- [ ] Error state: red banner with error message in Spanish below the form
+- [ ] On success: call `onResult(result: TaxResult)` prop
 
-- [ ] `packages/engine/src/minimums.ts` — Step 3: mínimo personal y familiar
-  - Base: 555000 cents (€5,550)
-  - Age 65–74: +115000 cents; Age 75+: +140000 cents on top of age-65 increase
-  - Per dependent under 25: +240000 (1st), +270000 (2nd), +400000 (3rd+)
-  - Per dependent under 3: additional +100000 each
-  - Per dependent over 65: +112500; over 75: +142500
-  - Returns `minimumPersonalFamiliar` in **cents**
+### Step 9 — Wire App.tsx
+- [ ] `App.tsx` manages state: `result: TaxResult | null`, `loading: boolean`, `error: string | null`
+- [ ] Shows `<InputForm>` always
+- [ ] Shows `<ResultDashboard>` and `<WaterfallChart>` only when `result !== null`
+- [ ] Remove mock data
+- [ ] Commit: `feat(frontend): InputForm wired to live /api/calculate [Phase 1]`
 
-- [ ] `packages/engine/src/brackets.ts` — Step 5: progressive bracket applier
+---
+
+## Phase 2 — AI Features
+> **Wait for `[SIGNAL: extract-ready]` and `[SIGNAL: explain-ready]` before this phase.**
+
+### Step 10 — ChatInput.tsx
+Create `packages/frontend/src/components/ChatInput.tsx`:
+
+- [ ] Free-text `<textarea>` with placeholder: "Ej: Tengo 35 años, vivo en Madrid y gané 40.000€ el año pasado"
+- [ ] Button: "Analizar"
+- [ ] Calls `taxai.extract(message)`, shows extracted fields in a summary card
+- [ ] Summary card: editable fields pre-filled with extracted values, user can correct them
+- [ ] "Confirmar y calcular" button → calls `taxai.calculate()` with confirmed values
+- [ ] Toggle between ChatInput and InputForm with tabs: "Formulario" / "Chat"
+
+### Step 11 — ExplanationPanel.tsx
+Create `packages/frontend/src/components/ExplanationPanel.tsx`:
+
+- [ ] Rendered below `<WaterfallChart>` after first calculation
+- [ ] Text input: placeholder "¿Tienes alguna pregunta sobre tu resultado?"
+- [ ] Button: "Preguntar"
+- [ ] Calls `taxai.explain(result, question)`, renders response as `<p>` prose
+- [ ] Loading state while awaiting AI response
+- [ ] The response must never show a number that wasn't already in the dashboard — this is enforced by the API, but visually verify it
+- [ ] Commit: `feat(frontend): ChatInput + ExplanationPanel [Phase 2]`
+
+---
+
+## Phase 3 — Region Selector UX
+
+- [ ] Replace bare region code in results with full Spanish name:
   ```typescript
-  // applyBrackets(baseInCents: number, brackets: Bracket[]): number
-  // Iterates brackets, applies rate to the slice within each bracket.
-  // Uses Math.round() at each boundary.
-  // Returns total tax in cents.
+  const REGION_NAMES: Record<SpanishRegion, string> = {
+    'madrid': 'Comunidad de Madrid',
+    'catalonia': 'Cataluña',
+    // ...all 17
+  }
   ```
-
-- [ ] `packages/engine/src/calculator.ts` — orchestrator: Steps 1–8
-  - Loads rules from JSON (step 1)
-  - Calls reductions.ts (step 2)
-  - Calls minimums.ts (step 3)
-  - Splits base 50% state / 50% regional (step 4)
-  - Applies state brackets + autonomic brackets (step 5)
-  - Applies minimum reduction to each half (step 6)
-  - Subtracts retenciones (step 7)
-  - Determines resultType (step 8)
-  - Builds `waterfallSteps` array with each intermediate value
-  - **Converts all cents to euros** before returning `TaxResult`
-
-### Step 5 — Parity tests
-- [ ] `packages/engine/tests/madrid.test.ts` — 5 test cases:
-  Use these known AT-verifiable inputs:
-  1. Salary €20,000, age 30, single, no deps, retenciones €2,400
-  2. Salary €35,000, age 30, single, no deps, retenciones €5,250
-  3. Salary €50,000, age 40, married, 1 dep <25, retenciones €9,000
-  4. Salary €80,000, age 45, single, no deps, retenciones €22,000
-  5. Salary €12,000, age 67, single, no deps, retenciones €0
-- [ ] `packages/engine/tests/catalonia.test.ts` — same 5 inputs for Catalonia
-- [ ] Run `pnpm test` — all pass before proceeding
-- [ ] Commit: `feat(engine): Madrid + Catalonia with parity tests [Phase 1]`
-
-### Step 6 — Fastify API server
-- [ ] Create `apps/api/package.json` — name `@taxai/api`, deps: `fastify`, `@fastify/cors`, `dotenv`, `@taxai/engine`, `@taxai/shared`
-- [ ] Create `.env.example`:
-  ```
-  ANTHROPIC_API_KEY=
-  PORT=3000
-  ```
-  Add `.env` to `.gitignore`
-- [ ] Create `apps/api/src/server.ts`:
-  - Register `@fastify/cors` with `origin: 'http://localhost:5173'`
-  - Register `dotenv`
-  - Mount routes
-  - Listen on `process.env.PORT ?? 3000`
-- [ ] Create `apps/api/src/routes/calculate.ts`:
-  - Validate request body matches `TaxInput` shape (use Fastify JSON schema)
-  - Call `calculator.calculate(input)`
-  - Return `TaxResult`
-  - On validation error: return 400 with message in Spanish
-- [ ] Smoke test:
-  ```bash
-  curl -s -X POST http://localhost:3000/api/calculate \
-    -H "Content-Type: application/json" \
-    -d '{"fiscalYear":2024,"region":"madrid","age":32,"grossSalary":35000,"retenciones":4200,"dependentsUnder25":0,"dependentsOver65":0,"civilStatus":"single"}'
-  ```
-- [ ] **Commit with signal:** `feat(api): POST /api/calculate live on :3000 [SIGNAL: calculate-ready]`
-
----
-
-## Phase 2 — AI Layer
-
-### Step 7 — Claude extractor
-- [ ] Create `packages/ai-layer/package.json` — deps: `@anthropic-ai/sdk`, `@taxai/shared`
-- [ ] Create `packages/ai-layer/src/prompts.ts` — system prompts as exported string constants
-- [ ] Create `packages/ai-layer/src/extractor.ts`:
-  - **PII guard:** reject/strip input matching `/\b\d{8}[A-Za-z]\b/` (DNI) or IBAN (`/\bES\d{22}\b/`) before calling API
-  - Use `tools` parameter (tool-use) so Claude returns a structured `Partial<TaxInput>` — never free text
-  - Tool definition must enumerate all `TaxInput` fields with descriptions in Spanish
-  - Model: `claude-sonnet-4-6`
-  - Only return fields the user explicitly mentioned — do not guess missing fields
-
-- [ ] Create `packages/ai-layer/src/routes/extract.ts`:
-  - `POST /api/extract` — body `{ message: string }`
-  - Returns `Partial<TaxInput>`
-  - If PII detected: return 400 `{ error: "No incluyas datos personales identificativos (DNI, IBAN, etc.)" }`
-
-### Step 8 — Claude explainer
-- [ ] Create `packages/ai-layer/src/explainer.ts`:
-  - System prompt (in `prompts.ts`): "Eres un asistente fiscal español. Explica el resultado usando únicamente los números del JSON proporcionado. No realices cálculos propios. Responde en español. Máximo 250 palabras."
-  - User message: include the full `waterfallSteps` array as formatted JSON + the user's question
-  - Returns `{ explanation: string }`
-
-- [ ] Create `apps/api/src/routes/explain.ts`:
-  - `POST /api/explain` — body `{ result: TaxResult, question: string }`
-  - Returns `{ explanation: string }`
-
-- [ ] Write tests for extractor: mock the Anthropic client, verify PII rejection, verify JSON output shape
-- [ ] **Commit with signal:** `feat(ai): extractor + explainer live [SIGNAL: extract-ready] [SIGNAL: explain-ready]`
-
----
-
-## Phase 3 — Full Regional Coverage
-
-- [ ] Add `packages/engine/rules/2024/{region}.json` for all 17 autonomías:
-  andalusia, aragon, asturias, balearics, canarias, cantabria,
-  castilla-la-mancha, castilla-leon, extremadura, galicia,
-  la-rioja, murcia, navarra, pais-vasco, valenciana
-- [ ] At least 2 parity test cases per new region
-- [ ] Commit: `feat(engine): all 17 autonomías rules and tests [Phase 3]`
+- [ ] Add visual indicator (colored dot or badge) by result type in hero card
+- [ ] Commit: `feat(frontend): region names and UX polish [Phase 3]`
 
 ---
 
 ## Phase 4 — Hardening
 
-- [ ] Edge cases: `grossSalary = 0`, salary > €300,000, disability grades, multiple dependents
-- [ ] Rate limiting on AI routes (max 20 req/min per IP) to control API cost
-- [ ] Error messages: all 4xx/5xx user-facing messages in Spanish
-- [ ] Commit: `feat(api): hardening and edge case handling [Phase 4]`
+- [ ] Accessibility: all form fields have `<label htmlFor>`, color contrast WCAG 2.1 AA
+- [ ] Keyboard navigation: form submits on Enter, tab order is logical
+- [ ] Empty state: helpful message when no result yet
+- [ ] Handle API down: show "El servicio no está disponible. Inténtalo más tarde." banner
+- [ ] Commit: `feat(frontend): accessibility and error handling [Phase 4]`
 
 ---
 
 ## Dev Commands
 
 ```bash
-# Install all deps from monorepo root
-pnpm install
+# From packages/frontend
+pnpm dev          # starts Vite on http://localhost:5173
+pnpm build        # production build
+pnpm test         # Vitest
 
-# Run all tests
-pnpm test
-
-# Start API server (from monorepo root)
-pnpm dev:api
-
-# Run engine tests only
-pnpm --filter @taxai/engine test
+# From monorepo root
+pnpm --filter @taxai/frontend dev
 ```
+
+## Spanish Region Names Reference
+
+| Code | Name |
+|---|---|
+| andalusia | Andalucía |
+| aragon | Aragón |
+| asturias | Asturias |
+| balearics | Islas Baleares |
+| canarias | Canarias |
+| cantabria | Cantabria |
+| castilla-la-mancha | Castilla-La Mancha |
+| castilla-leon | Castilla y León |
+| catalonia | Cataluña |
+| extremadura | Extremadura |
+| galicia | Galicia |
+| la-rioja | La Rioja |
+| madrid | Comunidad de Madrid |
+| murcia | Región de Murcia |
+| navarra | Navarra |
+| pais-vasco | País Vasco |
+| valenciana | Comunidad Valenciana |

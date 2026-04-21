@@ -1,0 +1,27 @@
+import type { TaxResult } from '@taxai/shared'
+
+export const MOCK_RESULT: TaxResult = {
+  fiscalYear: 2024,
+  region: 'madrid',
+  grossSalary: 35000,
+  rendimientoNetoReducido: 33000,
+  baseImponibleGeneral: 33000,
+  minimumPersonalFamiliar: 5550,
+  cuotaIntegraEstatal: 1669,
+  cuotaIntegraAutonomica: 1485,
+  cuotaIntegraTOTAL: 3154,
+  cuotaLiquidaEstatal: 1143,
+  cuotaLiquidaAutonomica: 960,
+  cuotaLiquidaTOTAL: 2103,
+  retenciones: 4200,
+  resultAmount: -2097,
+  resultType: 'a_devolver',
+  waterfallSteps: [
+    { label: 'Salario bruto', amount: 35000, runningTotal: 35000 },
+    { label: 'Reducción por trabajo', amount: -2000, runningTotal: 33000 },
+    { label: 'Cuota íntegra estatal', amount: 1669, runningTotal: 1669, bracketRate: 0.095 },
+    { label: 'Cuota íntegra autonómica (Madrid)', amount: 1485, runningTotal: 3154, bracketRate: 0.09 },
+    { label: 'Reducción mínimo personal', amount: -1051, runningTotal: 2103 },
+    { label: 'Retenciones a cuenta', amount: -4200, runningTotal: -2097 },
+  ],
+}

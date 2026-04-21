@@ -16,7 +16,7 @@ const regions: SpanishRegion[] = [
 
 function makeInput(region: SpanishRegion, grossSalary: number, retenciones: number): TaxInput {
   return {
-    fiscalYear: 2024,
+    fiscalYear: 2025,
     region,
     age: 35,
     grossSalary,
@@ -34,7 +34,7 @@ describe('All 15 additional autonomías — structural correctness', () => {
         const r = calculate(makeInput(region, 25000, 3000));
         // Structural checks
         expect(r.region).toBe(region);
-        expect(r.fiscalYear).toBe(2024);
+        expect(r.fiscalYear).toBe(2025);
         expect(r.grossSalary).toBe(25000);
         // Math consistency
         expect(Math.round(r.resultAmount * 100)).toBe(

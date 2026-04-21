@@ -1,0 +1,27 @@
+{
+  "region": "valenciana",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 12000,  "rate": 0.09  },
+    { "from": 12000,   "to": 22000,  "rate": 0.12  },
+    { "from": 22000,   "to": 32000,  "rate": 0.15  },
+    { "from": 32000,   "to": 42000,  "rate": 0.175 },
+    { "from": 42000,   "to": 52000,  "rate": 0.20  },
+    { "from": 52000,   "to": 65000,  "rate": 0.225 },
+    { "from": 65000,   "to": 72000,  "rate": 0.25  },
+    { "from": 72000,   "to": 100000, "rate": 0.265 },
+    { "from": 100000,  "to": 150000, "rate": 0.275 },
+    { "from": 150000,  "to": 200000, "rate": 0.285 },
+    { "from": 200000,  "to": null,   "rate": 0.295 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

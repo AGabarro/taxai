@@ -6,6 +6,7 @@ export interface TaxInput {
   otherIncome?: number;         // rendimientos del capital, etc.
   retenciones: number;          // withholdings already paid
   dependentsUnder25: number;    // children under 25 in household
+  dependentsUnder3?: number;    // subset of above who are under 3 (for supplement)
   dependentsOver65: number;     // elderly dependents
   civilStatus: CivilStatus;
   disability?: DisabilityGrade; // 33% or 65%+

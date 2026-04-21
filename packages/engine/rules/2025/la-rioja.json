@@ -1,0 +1,24 @@
+{
+  "region": "la-rioja",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 12450,  "rate": 0.08  },
+    { "from": 12450,   "to": 20200,  "rate": 0.106 },
+    { "from": 20200,   "to": 35200,  "rate": 0.136 },
+    { "from": 35200,   "to": 40000,  "rate": 0.178 },
+    { "from": 40000,   "to": 50000,  "rate": 0.183 },
+    { "from": 50000,   "to": 60000,  "rate": 0.19  },
+    { "from": 60000,   "to": 120000, "rate": 0.245 },
+    { "from": 120000,  "to": null,   "rate": 0.27  }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

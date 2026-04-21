@@ -8,7 +8,6 @@ import { calcMinimumPersonalFamiliar } from './minimums.js';
 const require = createRequire(import.meta.url);
 
 function loadStateRules(fiscalYear: number): StateRules {
-  // path is relative to this file at runtime
   return require(`../rules/${fiscalYear}/state.json`) as StateRules;
 }
 
@@ -19,6 +18,24 @@ function loadRegionRules(fiscalYear: number, region: string): RegionRules {
 /** Converts cents (integer) to euros (2 decimal places). */
 function toEuros(cents: number): number {
   return Math.round(cents) / 100;
+}
+
+/**
+ * Deducción por rendimientos del trabajo (new in 2025, from cuota líquida).
+ * Returns deduction in cents.
+ */
+function calcCuotaDeduction(grossSalaryCents: number): number {
+  const FULL_THRESHOLD = 1_657_600;  // €16,576
+  const PHASE_OUT_END  = 1_827_600;  // €18,276
+  const MAX_DEDUCTION  = 34_000;     // €340
+
+  if (grossSalaryCents <= FULL_THRESHOLD) {
+    return MAX_DEDUCTION;
+  } else if (grossSalaryCents <= PHASE_OUT_END) {
+    const excess = grossSalaryCents - FULL_THRESHOLD;
+    return Math.max(0, MAX_DEDUCTION - Math.round(0.2 * excess));
+  }
+  return 0;
 }
 
 export function calculate(input: TaxInput): TaxResult {
@@ -36,7 +53,8 @@ export function calculate(input: TaxInput): TaxResult {
     otherIncomeCents,
     regionRules.trabajoReductions,
   );
-  const rendimientoNetoReducidoCents = grossSalaryCents - trabajoReductionCents;
+  // rendimientoNetoReducido cannot be negative
+  const rendimientoNetoReducidoCents = Math.max(0, grossSalaryCents - trabajoReductionCents);
 
   // Step 3 — Base imponible general
   const baseImponibleGeneralCents = rendimientoNetoReducidoCents + otherIncomeCents;
@@ -44,25 +62,28 @@ export function calculate(input: TaxInput): TaxResult {
   // Step 4 — Mínimo personal y familiar
   const minimumCents = calcMinimumPersonalFamiliar(input);
 
-  // Step 5 — Split base 50% state / 50% regional
-  const stateBaseCents = Math.round(baseImponibleGeneralCents / 2);
-  // assign any rounding remainder to regional so both halves sum exactly to base
-  const regionalBaseCents = baseImponibleGeneralCents - stateBaseCents;
-
-  // Step 6 — Apply progressive brackets to each half
-  const cuotaIntegraEstatalCents = applyBrackets(stateBaseCents, stateRules.stateBrackets);
-  const cuotaIntegraAutonomicaCents = applyBrackets(regionalBaseCents, regionRules.autonomicBrackets);
+  // Step 5 — Apply state brackets to FULL base, regional brackets to FULL base
+  // (no 50/50 split — each tarifa is applied to the complete base independently)
+  const cuotaIntegraEstatalCents = applyBrackets(baseImponibleGeneralCents, stateRules.stateBrackets);
+  const cuotaIntegraAutonomicaCents = applyBrackets(baseImponibleGeneralCents, regionRules.autonomicBrackets);
   const cuotaIntegraTOTALCents = cuotaIntegraEstatalCents + cuotaIntegraAutonomicaCents;
 
-  // Step 7 — Subtract minimum quotas
-  const minStateBaseCents = Math.round(minimumCents / 2);
-  const minRegionalBaseCents = minimumCents - minStateBaseCents;
+  // Step 6 — Apply each tarifa to the FULL mínimo personal y familiar
+  const stateMinQuotaCents = applyBrackets(minimumCents, stateRules.stateBrackets);
+  const regionalMinQuotaCents = applyBrackets(minimumCents, regionRules.autonomicBrackets);
 
-  const stateMinQuotaCents = applyBrackets(minStateBaseCents, stateRules.stateBrackets);
-  const regionalMinQuotaCents = applyBrackets(minRegionalBaseCents, regionRules.autonomicBrackets);
+  let cuotaLiquidaEstatalCents = Math.max(0, cuotaIntegraEstatalCents - stateMinQuotaCents);
+  let cuotaLiquidaAutonomicaCents = Math.max(0, cuotaIntegraAutonomicaCents - regionalMinQuotaCents);
 
-  const cuotaLiquidaEstatalCents = Math.max(0, cuotaIntegraEstatalCents - stateMinQuotaCents);
-  const cuotaLiquidaAutonomicaCents = Math.max(0, cuotaIntegraAutonomicaCents - regionalMinQuotaCents);
+  // Step 7 — Deducción por rendimientos del trabajo (2025, split 50/50)
+  const deductionCents = calcCuotaDeduction(grossSalaryCents);
+  const deductionHalf = Math.round(deductionCents / 2);
+  const appliedEstatal    = Math.min(deductionHalf, cuotaLiquidaEstatalCents);
+  const appliedAutonomica = Math.min(deductionCents - deductionHalf, cuotaLiquidaAutonomicaCents);
+  const deductionAppliedCents = appliedEstatal + appliedAutonomica;
+
+  cuotaLiquidaEstatalCents    -= appliedEstatal;
+  cuotaLiquidaAutonomicaCents -= appliedAutonomica;
   const cuotaLiquidaTOTALCents = cuotaLiquidaEstatalCents + cuotaLiquidaAutonomicaCents;
 
   // Step 8 — Final result
@@ -70,13 +91,13 @@ export function calculate(input: TaxInput): TaxResult {
   const resultType =
     resultAmountCents > 0 ? 'a_ingresar' : resultAmountCents < 0 ? 'a_devolver' : 'cero';
 
-  // Build waterfall steps (in euros, for the chart)
   const waterfallSteps: WaterfallStep[] = buildWaterfall(
     grossSalaryCents,
     trabajoReductionCents,
     otherIncomeCents,
     cuotaIntegraTOTALCents,
-    cuotaLiquidaTOTALCents,
+    cuotaLiquidaTOTALCents + deductionAppliedCents,  // cuota before deduction for step
+    deductionAppliedCents,
     retencionesCents,
     resultAmountCents,
   );
@@ -106,7 +127,8 @@ function buildWaterfall(
   trabajoReductionCents: number,
   otherIncomeCents: number,
   cuotaIntegraTOTALCents: number,
-  cuotaLiquidaTOTALCents: number,
+  cuotaBeforeDeductionCents: number,
+  deductionAppliedCents: number,
   retencionesCents: number,
   resultAmountCents: number,
 ): WaterfallStep[] {
@@ -135,9 +157,15 @@ function buildWaterfall(
   });
   running = cuotaIntegraEuros;
 
-  const minReductionEuros = toEuros(-(cuotaIntegraTOTALCents - cuotaLiquidaTOTALCents));
+  const minReductionEuros = toEuros(-(cuotaIntegraTOTALCents - cuotaBeforeDeductionCents));
   running += minReductionEuros;
   steps.push({ label: 'Reducción mínimo personal y familiar', amount: minReductionEuros, runningTotal: running });
+
+  if (deductionAppliedCents > 0) {
+    const dedEuros = toEuros(-deductionAppliedCents);
+    running += dedEuros;
+    steps.push({ label: 'Deducción por rendimientos del trabajo', amount: dedEuros, runningTotal: running });
+  }
 
   if (retencionesCents !== 0) {
     const retEuros = toEuros(-retencionesCents);

@@ -1,0 +1,21 @@
+{
+  "region": "andalusia",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 13000,  "rate": 0.095 },
+    { "from": 13000,  "to": 21000,  "rate": 0.12  },
+    { "from": 21000,  "to": 35200,  "rate": 0.15  },
+    { "from": 35200,  "to": 50000,  "rate": 0.185 },
+    { "from": 50000,  "to": null,   "rate": 0.225 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

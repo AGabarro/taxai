@@ -1,0 +1,24 @@
+{
+  "region": "valenciana",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 12000,  "rate": 0.09  },
+    { "from": 12000,  "to": 22000,  "rate": 0.12  },
+    { "from": 22000,  "to": 32000,  "rate": 0.15  },
+    { "from": 32000,  "to": 42000,  "rate": 0.175 },
+    { "from": 42000,  "to": 52000,  "rate": 0.20  },
+    { "from": 52000,  "to": 62000,  "rate": 0.225 },
+    { "from": 62000,  "to": 72000,  "rate": 0.25  },
+    { "from": 72000,  "to": 100000, "rate": 0.275 },
+    { "from": 100000, "to": 150000, "rate": 0.285 },
+    { "from": 150000, "to": 200000, "rate": 0.285 },
+    { "from": 200000, "to": null,   "rate": 0.295 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "region": "cantabria",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,     "to": 13000,  "rate": 0.085 },
+    { "from": 13000, "to": 21000,  "rate": 0.11  },
+    { "from": 21000, "to": 35200,  "rate": 0.145 },
+    { "from": 35200, "to": 60000,  "rate": 0.18  },
+    { "from": 60000, "to": 90000,  "rate": 0.225 },
+    { "from": 90000, "to": null,   "rate": 0.245 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

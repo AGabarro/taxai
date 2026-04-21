@@ -1,0 +1,18 @@
+{
+  "region": "andalusia",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,     "to": 13000,  "rate": 0.095 },
+    { "from": 13000, "to": 21100,  "rate": 0.12  },
+    { "from": 21100, "to": 35200,  "rate": 0.15  },
+    { "from": 35200, "to": 60000,  "rate": 0.185 },
+    { "from": 60000, "to": null,   "rate": 0.225 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

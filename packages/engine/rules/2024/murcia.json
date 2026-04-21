@@ -1,0 +1,18 @@
+{
+  "region": "murcia",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,     "to": 12450,  "rate": 0.095 },
+    { "from": 12450, "to": 20200,  "rate": 0.112 },
+    { "from": 20200, "to": 34000,  "rate": 0.133 },
+    { "from": 34000, "to": 60000,  "rate": 0.179 },
+    { "from": 60000, "to": null,   "rate": 0.225 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

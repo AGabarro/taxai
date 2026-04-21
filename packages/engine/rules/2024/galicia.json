@@ -1,0 +1,18 @@
+{
+  "region": "galicia",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,         "to": 12985.35, "rate": 0.09   },
+    { "from": 12985.35,  "to": 21068.60, "rate": 0.1165 },
+    { "from": 21068.60,  "to": 35200,    "rate": 0.149  },
+    { "from": 35200,     "to": 60000,    "rate": 0.184  },
+    { "from": 60000,     "to": null,     "rate": 0.225  }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

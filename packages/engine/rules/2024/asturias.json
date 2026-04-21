@@ -1,0 +1,21 @@
+{
+  "region": "asturias",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,         "to": 12450,    "rate": 0.10  },
+    { "from": 12450,     "to": 17707.20, "rate": 0.12  },
+    { "from": 17707.20,  "to": 33007.20, "rate": 0.14  },
+    { "from": 33007.20,  "to": 53407.20, "rate": 0.185 },
+    { "from": 53407.20,  "to": 70000,    "rate": 0.215 },
+    { "from": 70000,     "to": 90000,    "rate": 0.225 },
+    { "from": 90000,     "to": 175000,   "rate": 0.25  },
+    { "from": 175000,    "to": null,     "rate": 0.255 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "region": "aragon",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 13072.50, "rate": 0.095 },
+    { "from": 13072.50,"to": 21210,    "rate": 0.12  },
+    { "from": 21210,   "to": 36960,    "rate": 0.15  },
+    { "from": 36960,   "to": 52500,    "rate": 0.185 },
+    { "from": 52500,   "to": 60000,    "rate": 0.205 },
+    { "from": 60000,   "to": 80000,    "rate": 0.23  },
+    { "from": 80000,   "to": 90000,    "rate": 0.24  },
+    { "from": 90000,   "to": 130000,   "rate": 0.25  },
+    { "from": 130000,  "to": null,     "rate": 0.255 }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

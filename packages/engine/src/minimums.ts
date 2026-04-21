@@ -1,0 +1,41 @@
+import type { TaxInput } from '@taxai/shared';
+
+// All constants in cents (euros × 100)
+const PERSONAL_BASE = 555_000;        // €5,550
+const PERSONAL_AGE_65 = 115_000;      // +€1,150 for age 65–74
+const PERSONAL_AGE_75 = 140_000;      // additional +€1,400 for age ≥75 (on top of AGE_65)
+
+const CHILD_1ST = 240_000;            // €2,400 — 1st child under 25
+const CHILD_2ND = 270_000;            // €2,700 — 2nd child
+const CHILD_3RD_PLUS = 400_000;       // €4,000 — 3rd and each subsequent child
+
+const ASCENDANT_OVER_65 = 112_500;    // €1,125 per ascendant over 65
+
+/**
+ * Calculates the mínimo personal y familiar (Art. 57–61 LIRPF).
+ * Returns value in cents.
+ */
+export function calcMinimumPersonalFamiliar(input: TaxInput): number {
+  let minimumCents = PERSONAL_BASE;
+
+  // Mínimo por edad del contribuyente
+  if (input.age >= 75) {
+    minimumCents += PERSONAL_AGE_65 + PERSONAL_AGE_75;
+  } else if (input.age >= 65) {
+    minimumCents += PERSONAL_AGE_65;
+  }
+
+  // Mínimo por descendientes (under 25, living with taxpayer)
+  const n = input.dependentsUnder25;
+  if (n >= 1) minimumCents += CHILD_1ST;
+  if (n >= 2) minimumCents += CHILD_2ND;
+  // 3rd child onwards
+  for (let i = 3; i <= n; i++) {
+    minimumCents += CHILD_3RD_PLUS;
+  }
+
+  // Mínimo por ascendientes (over 65)
+  minimumCents += input.dependentsOver65 * ASCENDANT_OVER_65;
+
+  return minimumCents;
+}

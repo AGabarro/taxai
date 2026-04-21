@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "name": "taxai",
+  "workspaces": ["packages/*", "apps/*"],
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

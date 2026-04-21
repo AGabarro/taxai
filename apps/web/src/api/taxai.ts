@@ -1,6 +1,8 @@
 import type { TaxInput, TaxResult } from '@taxai/shared'
 
-const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000'
+// Empty string = relative URLs (same origin). Works for both production (Fastify serves everything)
+// and dev (Vite proxies /api/* to localhost:3000 via vite.config.ts).
+const BASE = import.meta.env.VITE_API_BASE ?? ''
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {

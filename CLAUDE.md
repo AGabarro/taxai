@@ -81,7 +81,16 @@ taxai/
 │   │   │   ├── explainer.ts         ← TaxResult → plain Spanish prose
 │   │   │   └── prompts.ts           ← all Claude prompt templates
 │   │   └── tests/
-│   └── frontend/                   ← AGENT B OWNS THIS
+├── apps/
+│   ├── api/                         ← AGENT A OWNS THIS
+│   │   ├── src/
+│   │   │   ├── server.ts
+│   │   │   └── routes/
+│   │   │       ├── calculate.ts     ← POST /api/calculate
+│   │   │       ├── explain.ts       ← POST /api/explain
+│   │   │       └── extract.ts       ← POST /api/extract
+│   │   └── tests/
+│   └── web/                         ← AGENT B OWNS THIS
 │       ├── src/
 │       │   ├── components/
 │       │   │   ├── InputForm.tsx    ← traditional form path
@@ -93,15 +102,11 @@ taxai/
 │       │   │   └── taxai.ts         ← typed fetch calls to backend
 │       │   └── App.tsx
 │       └── tests/
-├── apps/
-│   └── api/                         ← AGENT A OWNS THIS
-│       ├── src/
-│       │   ├── server.ts
-│       │   └── routes/
-│       │       ├── calculate.ts     ← POST /api/calculate
-│       │       ├── explain.ts       ← POST /api/explain
-│       │       └── extract.ts       ← POST /api/extract
-│       └── tests/
+├── docs/                            ← project documentation
+│   ├── INTEGRATION.md
+│   ├── TASKS.md
+│   ├── START_PROMPT.md
+│   └── TAX_RULES_2025.md
 └── package.json                     ← workspace root
 ```
 
@@ -230,7 +235,7 @@ POST /api/explain
 
 ### Agent B — Frontend
 
-**Owns:** `packages/frontend/`
+**Owns:** `apps/web/`
 
 **First milestone:** Build the **Results Dashboard** as a static component using hardcoded mock `TaxResult` data. This is the core value proposition and must be pixel-perfect before connecting the API.
 

@@ -3,8 +3,11 @@
   "name": "taxai",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "test": "pnpm -r test",
-    "dev:api": "pnpm --filter @taxai/api dev"
+    "build": "pnpm --filter @taxai/frontend build",
+    "start": "pnpm build && pnpm --filter @taxai/api dev",
+    "dev:api": "pnpm --filter @taxai/api dev",
+    "dev:ui": "pnpm --filter @taxai/frontend dev",
+    "test": "pnpm -r test"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"]

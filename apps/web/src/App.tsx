@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { TaxResult } from '@taxai/shared'
 import { ResultDashboard } from './components/ResultDashboard'
 import { WaterfallChart } from './components/WaterfallChart'
+import { TaxBreakdownCharts } from './components/TaxBreakdownCharts'
 import { InputForm } from './components/InputForm'
 import { ChatInput } from './components/ChatInput'
 import { ExplanationPanel } from './components/ExplanationPanel'
@@ -66,6 +67,7 @@ export default function App() {
         {result ? (
           <section className="space-y-4" aria-label="Resultados de la declaración">
             <ResultDashboard result={result} />
+            <TaxBreakdownCharts result={result} />
             <WaterfallChart steps={result.waterfallSteps} />
             <ExplanationPanel result={result} />
           </section>

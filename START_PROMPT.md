@@ -1,16 +1,64 @@
-You are Agent A on the Taxai project — you own the backend, tax engine, and AI layer.
+# Agent B — Integration Sprint: Connect Live API + 2025 Labels
 
-Before writing any code, read these two files in this directory:
-1. `CLAUDE.md` — full project brief, architecture rules, data contracts, and the Golden Rule
-2. `TASKS.md` — your step-by-step build plan, phase by phase
+You are Agent B. Your branch is `feature/frontend`. The project is now in integration phase — Agent A is fixing the backend engine. Your job is 3 small but important fixes so the UI connects to the real API correctly.
 
-Then begin immediately at Phase 0, Step 1 of TASKS.md.
+---
 
-Key things to keep in mind as you work:
-- All currency arithmetic must use integer cents internally. Divide by 100 only at the API response boundary.
-- The AI (Claude) is forbidden from doing math. It only extracts structured data from user text and explains results already calculated by the engine.
-- Never send PII (DNI, NIE, IBAN, names) to the Claude API.
-- Agent B is working in parallel on the frontend. Unblock them as fast as possible by completing Phase 0 Step 2 (publishing `packages/shared` types) first.
-- Signal your progress to Agent B with the commit tags defined in TASKS.md (e.g. `[SIGNAL: shared-types-ready]`).
+## Fix 1 — Remove mock data from initial state (MOST IMPORTANT)
 
-Start now.
+**File:** `packages/frontend/src/App.tsx`
+
+The app currently loads `MOCK_RESULT` as the initial state, so the user always sees fake data on load. Fix it:
+
+Find the line that looks like:
+```ts
+const [result, setResult] = useState<TaxResult | null>(MOCK_RESULT)
+```
+Change it to:
+```ts
+const [result, setResult] = useState<TaxResult | null>(null)
+```
+
+Then remove the `MOCK_RESULT` import from the top of the file. The mock file (`src/mocks/taxResult.ts`) can stay — it is used by tests — but it must not load in the app.
+
+Verify the empty state UI shows correctly (the guidance message, not an empty screen).
+
+---
+
+## Fix 2 — Update "IRPF 2024" labels to "IRPF 2025"
+
+Search all `.tsx` and `.ts` files in `packages/frontend/src/` for any hardcoded `2024` strings used as **display text** (not inside mock data or test fixtures).
+
+Key places to check:
+- `App.tsx` header subtitle (should read "Calculadora IRPF 2025")
+- `ResultDashboard.tsx` — any year label
+- `InputForm.tsx` — any placeholder or label referencing the year
+- `src/api/taxai.ts` — if fiscalYear is hardcoded anywhere
+
+---
+
+## Fix 3 — Default fiscalYear to 2025 in the form
+
+**File:** `packages/frontend/src/components/InputForm.tsx`
+
+Find the `fiscalYear` field initial value and change it from `2024` to `2025`.
+
+---
+
+## When done
+
+Run `pnpm --filter @taxai/frontend test` — all tests should still pass.
+
+Commit: `feat(frontend): connect live API + 2025 labels [SIGNAL: frontend-live-ready]`
+
+---
+
+## What comes next (you don't need to act on this yet)
+
+Once Agent A signals `[SIGNAL: engine-2025-ready]`, pull their fixes:
+```bash
+git fetch origin
+git merge origin/feature/backend --no-edit
+```
+
+Then the orchestrator (main session) will run the full integration test. If any UI bugs are found, they will be sent back to you with exact reproduction steps.

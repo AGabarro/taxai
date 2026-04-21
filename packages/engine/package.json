@@ -2,8 +2,8 @@
   "name": "@taxai/engine",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/calculator.ts",
-  "types": "./src/calculator.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run"
   },

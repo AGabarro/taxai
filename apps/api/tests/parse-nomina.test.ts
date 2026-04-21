@@ -13,12 +13,63 @@ vi.mock('@taxai/engine', () => ({ calculate: vi.fn() }));
 
 import {
   annualise,
+  detectProration,
   deriveAnnualGross,
   deriveAnnualRetenciones,
   deriveAnnualSS,
   buildComparison,
 } from '../src/routes/parse-nomina.js';
 import type { NominaData } from '@taxai/shared';
+
+// ── detectProration ──────────────────────────────────────────────────────────
+
+describe('detectProration', () => {
+  // Positive cases — payslips where extra pay is already spread across 12 months
+  it('detects "P.P. Extras" (exact label, common in Sage/A3)', () => {
+    expect(detectProration('DEVENGOS\nSalario Base 2000\nP.P. Extras 300\nTotal 2300')).toBe(true);
+  });
+
+  it('detects "P.P.Extras" without spaces', () => {
+    expect(detectProration('P.P.Extras 250,00')).toBe(true);
+  });
+
+  it('detects "PP Extras" without dots', () => {
+    expect(detectProration('PP Extras 300.00')).toBe(true);
+  });
+
+  it('detects "Prorrateo" keyword', () => {
+    expect(detectProration('Prorrateo pagas extras 250,00')).toBe(true);
+  });
+
+  it('detects "prorrat." abbreviation (case-insensitive)', () => {
+    expect(detectProration('Paga Verano prorrat. 350')).toBe(true);
+  });
+
+  it('detects "P.P. Paga Verano"', () => {
+    expect(detectProration('Concepto: P.P. Paga Verano  Importe: 298,34')).toBe(true);
+  });
+
+  it('detects "P.P. Paga Navidad"', () => {
+    expect(detectProration('P.P. Paga Navidad 298,34')).toBe(true);
+  });
+
+  it('detects "Extra prorr" pattern', () => {
+    expect(detectProration('Paga Extra prorr 250,00')).toBe(true);
+  });
+
+  // Negative cases — payslips with separate extra-pay months (not prorated)
+  it('returns false for a regular payslip with no proration markers', () => {
+    expect(detectProration('Salario Base 2000\nComplementos 300\nTotal Devengado 2300')).toBe(false);
+  });
+
+  it('returns false for an actual separate extra-pay payslip', () => {
+    expect(detectProration('PERIODO: Paga de Navidad Diciembre 2025\nSalario Base 2000')).toBe(false);
+  });
+
+  it('returns false for an empty string', () => {
+    expect(detectProration('')).toBe(false);
+  });
+});
 
 // ── annualise ────────────────────────────────────────────────────────────────
 
@@ -141,6 +192,32 @@ describe('deriveAnnualSS', () => {
 
   it('returns 0 when no SS data', () => {
     expect(deriveAnnualSS({})).toBe(0);
+  });
+});
+
+// ── proration + annualisation integration ────────────────────────────────────
+
+describe('prorated payslip annualisation', () => {
+  it('produces correct annual figures when proration overrides numberOfPayments to 12', () => {
+    // Scenario from real payslip: monthly gross 4,598.17 with P.P. Extras line item
+    const nomina: NominaData = {
+      monthlyGross: 4598.17,
+      monthlyRetenciones: 1038.78,
+      monthlySSEmployee: 293.38,
+      numberOfPayments: 12,   // proration already applied by route override
+    };
+
+    expect(deriveAnnualGross(nomina)).toBe(55178.04);       // 4598.17 × 12
+    expect(deriveAnnualRetenciones(nomina)).toBe(12465.36); // 1038.78 × 12
+    expect(deriveAnnualSS(nomina)).toBe(3520.56);           // 293.38  × 12
+  });
+
+  it('would over-estimate by 16.7% if 14 were used instead of 12', () => {
+    const nomina: NominaData = { monthlyGross: 4598.17, numberOfPayments: 14 };
+    const wrong = deriveAnnualGross(nomina);   // 64,374.38 — incorrect
+    const correct = deriveAnnualGross({ ...nomina, numberOfPayments: 12 }); // 55,178.04
+    expect(wrong).toBeGreaterThan(correct);
+    expect(Math.round((wrong / correct - 1) * 100)).toBe(17); // ~17% overestimate
   });
 });
 

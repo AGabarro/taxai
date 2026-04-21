@@ -24,6 +24,38 @@ const VALID_CIVIL_STATUS: CivilStatus[] = ['single', 'married', 'widowed', 'sepa
 
 const CORRECT_THRESHOLD_PCT = 2; // within 2% → considered correct
 
+/**
+ * Patterns that indicate the payslip already contains prorated extra payments
+ * as monthly line items (pagas prorrateadas). When any of these appear in the
+ * devengos/earnings section the monthly Total Devengado ALREADY includes the
+ * proportional share of the extra pay — the correct annual multiplier is 12,
+ * not 14.
+ *
+ * Covers common label variants found across Spanish payroll software:
+ *   - "P.P. Extras" / "P.P.Extras" / "PP Extras"
+ *   - "Prorrateo" / "Prorrat."
+ *   - "P.P. Paga Verano" / "P.P. Paga Navidad"
+ *   - "Paga Verano prorr" / "Paga Navidad prorr"
+ */
+const PRORATION_PATTERNS = [
+  /\bP\.?\s*P\.?\s*Extras?\b/i,
+  /prorrate[oa]/i,
+  /\bP\.?\s*P\.?\s*Paga\s+(Verano|Navidad|Extra)/i,
+  /Paga\s+(Verano|Navidad)\s+prorr/i,
+  /Extra\s+prorr/i,
+];
+
+/**
+ * Returns true when the PDF text contains prorated-payment line items,
+ * meaning the monthly Total Devengado already includes extra pay proportionally.
+ * In that case the correct annual multiplier is 12.
+ *
+ * Exported so it can be unit-tested independently.
+ */
+export function detectProration(pdfText: string): boolean {
+  return PRORATION_PATTERNS.some((re) => re.test(pdfText));
+}
+
 /** Annualise a monthly figure using the number of salary payments per year. */
 export function annualise(monthly: number, numberOfPayments = 12): number {
   return Math.round(monthly * numberOfPayments * 100) / 100;
@@ -175,6 +207,12 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
         return reply.status(422).send({ error: 'El PDF no contiene texto legible. Puede ser un PDF escaneado.' });
       }
 
+      // Deterministic proration check — runs on raw PDF text BEFORE calling Claude.
+      // If the payslip contains prorated-extra-pay line items (P.P. Extras, Prorrateo, etc.)
+      // the monthly Total Devengado already includes the proportional share of extra pay,
+      // so the correct annual multiplier is 12, not 14.
+      const isProrated = detectProration(pdfText);
+
       // Use Claude to extract nomina data
       let nomina: NominaData;
       try {
@@ -182,6 +220,12 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
       } catch (err) {
         app.log.error(err);
         return reply.status(500).send({ error: 'Error al analizar la nómina con IA. Inténtalo de nuevo.' });
+      }
+
+      // Authoritative override: proration detected in raw text always wins over
+      // whatever numberOfPayments Claude may have extracted.
+      if (isProrated) {
+        nomina = { ...nomina, numberOfPayments: 12 };
       }
 
       const annualGross = deriveAnnualGross(nomina);

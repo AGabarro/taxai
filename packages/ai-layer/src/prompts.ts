@@ -15,7 +15,10 @@ Reglas estrictas:
 - Si un campo no aparece con claridad en el texto, omítelo (no lo inventes ni lo estimes).
 - "period": período de liquidación (ej. "enero 2025", "12/2024").
 - "fiscalYear": año fiscal del período (ej. 2025 si el período es enero 2025).
-- "numberOfPayments": número de pagas anuales. Si la nómina indica "14 pagas", "paga extra", "prorrateo de pagas extras" o similar, infiere 14. Si no hay indicación, omite el campo (por defecto se asumirá 12).
+- "numberOfPayments": número de pagas anuales. Reglas CRÍTICAS:
+  * Si en la sección de DEVENGOS aparece un concepto como "P.P. Extras", "Paga Extra Prorr", "Prorrateo pagas", "P.P. Paga Verano", "P.P. Paga Navidad" o cualquier variante de "prorrateo" → pon 12. Esto significa que las pagas extras ya están repartidas dentro del salario mensual; multiplicar por 14 sobreestimaría el ingreso anual.
+  * Si la nómina es ELLA MISMA una paga extra (el período indica "Paga de Verano", "Paga de Navidad", "Paga Extra" como período completo, no como un concepto dentro de devengos) → pon 14 y extrae ese importe como paga adicional.
+  * Si no hay ninguna indicación clara → omite el campo (se asumirá 12 por defecto).
 - "monthlyGross": Total Devengado del período (suma de todos los conceptos salariales devengados).
 - "monthlyRetenciones": importe de la retención IRPF de este período. Busca el concepto etiquetado como "Tributación I.R.P.F.", "Retención IRPF", "IRPF" o concepto 999. Usa el importe en euros, no el porcentaje.
 - "retentionPercentage": tipo de retención IRPF aplicado (ej. 15.5 para 15,5%).

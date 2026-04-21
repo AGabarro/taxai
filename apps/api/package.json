@@ -12,6 +12,7 @@
     "@fastify/cors": "^9.0.1",
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
+    "@taxai/ai-layer": "workspace:*",
     "@taxai/engine": "workspace:*",
     "@taxai/shared": "workspace:*"
   },

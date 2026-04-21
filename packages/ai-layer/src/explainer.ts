@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { TextBlock } from '@anthropic-ai/sdk/resources/messages.js';
 import type { TaxResult } from '@taxai/shared';
 import { EXPLAINER_SYSTEM_PROMPT } from './prompts.js';
 
 export async function explainResult(
   result: TaxResult,
   question: string,
-  client?: Anthropic,
+  client?: InstanceType<typeof Anthropic>,
 ): Promise<string> {
   const anthropic = client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -24,7 +25,7 @@ Pregunta del usuario: ${question}
   });
 
   const textBlock = response.content.find(
-    (block): block is Anthropic.TextBlock => block.type === 'text',
+    (block): block is TextBlock => block.type === 'text',
   );
 
   return textBlock?.text ?? '';

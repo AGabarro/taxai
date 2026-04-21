@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages.js';
 import type { TaxInput, SpanishRegion, CivilStatus, DisabilityGrade } from '@taxai/shared';
 import { EXTRACTOR_SYSTEM_PROMPT } from './prompts.js';
 
@@ -30,7 +31,7 @@ const VALID_CIVIL_STATUS: CivilStatus[] = ['single', 'married', 'widowed', 'sepa
 const VALID_DISABILITY: DisabilityGrade[] = [33, 65];
 
 // Tool definition for structured extraction
-const EXTRACT_TOOL: Anthropic.Tool = {
+const EXTRACT_TOOL: Tool = {
   name: 'extract_tax_data',
   description: 'Extrae los datos fiscales del mensaje del usuario para el cálculo del IRPF',
   input_schema: {
@@ -86,7 +87,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
 
 export async function extractTaxInput(
   message: string,
-  client?: Anthropic,
+  client?: InstanceType<typeof Anthropic>,
 ): Promise<Partial<TaxInput>> {
   if (detectPii(message)) {
     throw new PiiDetectedError();
@@ -104,7 +105,7 @@ export async function extractTaxInput(
   });
 
   // Find tool use block
-  const toolUse = response.content.find((block): block is Anthropic.ToolUseBlock =>
+  const toolUse = response.content.find((block): block is ToolUseBlock =>
     block.type === 'tool_use' && block.name === 'extract_tax_data',
   );
 

@@ -13,12 +13,18 @@ Tu única tarea es extraer los datos financieros de un texto de nómina y devolv
 Reglas estrictas:
 - Extrae ÚNICAMENTE los campos financieros numéricos. No devuelvas nombres, DNI, dirección ni ningún dato personal.
 - Si un campo no aparece con claridad en el texto, omítelo (no lo inventes ni lo estimes).
-- El campo "period" debe ser el período de liquidación (ej. "enero 2025", "12/2024").
-- "monthlyGross" es el Total Devengado o salario bruto del período.
-- "monthlyRetenciones" es la cantidad retenida en concepto de IRPF este período (en euros, no el porcentaje).
-- "retentionPercentage" es el tipo de retención IRPF aplicado (en porcentaje, ej. 15.5).
-- "monthlySSEmployee" es la cuota del trabajador a la Seguridad Social (suma de contingencias comunes, desempleo, formación).
-- "annualGross" y "annualRetenciones" sólo si la nómina muestra totales acumulados anuales.
+- "period": período de liquidación (ej. "enero 2025", "12/2024").
+- "fiscalYear": año fiscal del período (ej. 2025 si el período es enero 2025).
+- "numberOfPayments": número de pagas anuales. Si la nómina indica "14 pagas", "paga extra", "prorrateo de pagas extras" o similar, infiere 14. Si no hay indicación, omite el campo (por defecto se asumirá 12).
+- "monthlyGross": Total Devengado del período (suma de todos los conceptos salariales devengados).
+- "monthlyRetenciones": importe de la retención IRPF de este período. Busca el concepto etiquetado como "Tributación I.R.P.F.", "Retención IRPF", "IRPF" o concepto 999. Usa el importe en euros, no el porcentaje.
+- "retentionPercentage": tipo de retención IRPF aplicado (ej. 15.5 para 15,5%).
+- "monthlySS_CC": Contingencias Comunes del trabajador (cuota del empleado, no del empleador).
+- "monthlySS_MEI": MEI (Mecanismo de Equidad Intergeneracional) del trabajador.
+- "monthlySS_unemployment": Desempleo del trabajador.
+- "monthlySS_vocational": Formación Profesional del trabajador.
+- "monthlySSEmployee": si los conceptos SS anteriores no aparecen desglosados pero hay un total de cuotas SS del trabajador, usa este campo. Si SÍ aparecen desglosados, omite este campo (se sumará automáticamente).
+- "annualGross" y "annualRetenciones": sólo si la nómina muestra totales acumulados anuales explícitamente.
 - Responde siempre usando la herramienta proporcionada, nunca con texto libre.`;
 
 export const EXPLAINER_SYSTEM_PROMPT = `Eres un asistente fiscal español experto en IRPF.

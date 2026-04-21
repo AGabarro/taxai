@@ -376,3 +376,80 @@ describe('Reducción rendimientos del trabajo — boundary cases', () => {
     expect(r.rendimientoNetoReducido).toBe(19_747.50);
   });
 });
+
+// ─── BLOCK 5: SS contributions as gastos deducibles (Art. 19 LIRPF) ──────────
+
+describe('ssContributions — Art. 19 gastos deducibles', () => {
+  /**
+   * Employee SS contributions are "gastos deducibles" (Art. 19.2.a LIRPF).
+   * They reduce the rendimiento íntegro BEFORE the Art. 20 trabajo reduction
+   * thresholds are evaluated.
+   *
+   * Example: gross €30,000, SS €1,858.56 (typical ~6.35% of gross)
+   *   grossAfterSS = 30,000 − 1,858.56 = 28,141.44
+   *   rnt = 28,141.44 − 2,000 = 26,141.44 > 19,747.50 → reducción Art.20 = 0
+   *   trabajoReduction = gastoFlat(2,000) + art20(0) = 2,000
+   *   rendimientoNetoReducido = 28,141.44 − 2,000 = 26,141.44
+   *
+   * Without SS: rnt = 30,000 − 2,000 = 28,000 > threshold → reducción = 0
+   *   rendimientoNetoReducido = 30,000 − 2,000 = 28,000.
+   *
+   * With SS:    rendimientoNetoReducido = 26,141.44  (lower → less tax).
+   */
+  it('SS reduces rendimientoNetoReducido and produces lower tax than without SS', () => {
+    const base = {
+      fiscalYear: 2025 as const,
+      region: 'madrid' as const,
+      age: 30,
+      civilStatus: 'single' as const,
+      dependentsUnder25: 0,
+      dependentsOver65: 0,
+      retenciones: 0,
+    };
+
+    const withoutSS = calculate({ ...base, grossSalary: 30_000 });
+    const withSS    = calculate({ ...base, grossSalary: 30_000, ssContributions: 1_858.56 });
+
+    // rendimientoNetoReducido = grossAfterSS − trabajoReduction(2000) = 26,141.44
+    // without SS it's gross − 2000 = 28,000
+    expect(withSS.rendimientoNetoReducido).toBeCloseTo(26_141.44, 1);
+    expect(withoutSS.rendimientoNetoReducido).toBe(28_000);
+
+    // Final tax with SS is lower than without (smaller taxable base)
+    expect(withSS.cuotaLiquidaTOTAL).toBeLessThan(withoutSS.cuotaLiquidaTOTAL);
+  });
+
+  it('SS deduction shows in waterfall steps', () => {
+    const r = calculate({
+      fiscalYear: 2025,
+      region: 'madrid',
+      grossSalary: 30_000,
+      ssContributions: 1_858.56,
+      age: 30,
+      civilStatus: 'single',
+      dependentsUnder25: 0,
+      dependentsOver65: 0,
+      retenciones: 0,
+    });
+
+    const ssStep = r.waterfallSteps.find(s => s.label.includes('Seguridad Social'));
+    expect(ssStep).toBeDefined();
+    expect(ssStep!.amount).toBeCloseTo(-1_858.56, 1);
+  });
+
+  it('ssContributions = 0 gives identical result to omitting the field', () => {
+    const base = {
+      fiscalYear: 2025 as const,
+      region: 'madrid' as const,
+      grossSalary: 40_000,
+      age: 35,
+      civilStatus: 'single' as const,
+      dependentsUnder25: 0,
+      dependentsOver65: 0,
+      retenciones: 0,
+    };
+    const r1 = calculate(base);
+    const r2 = calculate({ ...base, ssContributions: 0 });
+    expect(r1.cuotaLiquidaTOTAL).toBe(r2.cuotaLiquidaTOTAL);
+  });
+});

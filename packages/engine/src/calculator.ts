@@ -46,15 +46,23 @@ export function calculate(input: TaxInput): TaxResult {
   const grossSalaryCents = Math.round(input.grossSalary * 100);
   const otherIncomeCents = Math.round((input.otherIncome ?? 0) * 100);
   const retencionesCents = Math.round(input.retenciones * 100);
+  // Art. 19.2.a LIRPF — employee SS contributions are gastos deducibles
+  const ssCents = Math.round((input.ssContributions ?? 0) * 100);
 
-  // Step 2 — Reducción por rendimientos del trabajo
+  // Step 1b — Subtract Art. 19 gastos (SS) to get rendimiento neto previo basis
+  //           The €2,000 flat gasto is handled inside calcTrabajoReduction.
+  //           We pass (gross − SS) so the Art. 20 reduction thresholds are applied
+  //           to the correct base: rendimiento neto previo = gross − SS − €2,000.
+  const grossAfterSSCents = grossSalaryCents - ssCents;
+
+  // Step 2 — Reducción por rendimientos del trabajo (Art. 20 LIRPF)
   const trabajoReductionCents = calcTrabajoReduction(
-    grossSalaryCents,
+    grossAfterSSCents,
     otherIncomeCents,
     regionRules.trabajoReductions,
   );
-  // rendimientoNetoReducido cannot be negative
-  const rendimientoNetoReducidoCents = Math.max(0, grossSalaryCents - trabajoReductionCents);
+  // rendimientoNetoReducido = gross − SS − trabajoReduction (which includes €2,000 flat)
+  const rendimientoNetoReducidoCents = Math.max(0, grossAfterSSCents - trabajoReductionCents);
 
   // Step 3 — Base imponible general
   const baseImponibleGeneralCents = rendimientoNetoReducidoCents + otherIncomeCents;
@@ -93,6 +101,7 @@ export function calculate(input: TaxInput): TaxResult {
 
   const waterfallSteps: WaterfallStep[] = buildWaterfall(
     grossSalaryCents,
+    ssCents,
     trabajoReductionCents,
     otherIncomeCents,
     cuotaIntegraTOTALCents,
@@ -124,6 +133,7 @@ export function calculate(input: TaxInput): TaxResult {
 
 function buildWaterfall(
   grossSalaryCents: number,
+  ssCents: number,
   trabajoReductionCents: number,
   otherIncomeCents: number,
   cuotaIntegraTOTALCents: number,
@@ -137,6 +147,12 @@ function buildWaterfall(
   // Phase 1: income → base imponible (values in euros)
   let running = toEuros(grossSalaryCents);
   steps.push({ label: 'Salario bruto', amount: toEuros(grossSalaryCents), runningTotal: running });
+
+  if (ssCents > 0) {
+    const ssEuros = toEuros(-ssCents);
+    running += ssEuros;
+    steps.push({ label: 'Cuotas Seguridad Social (Art. 19)', amount: ssEuros, runningTotal: running });
+  }
 
   if (otherIncomeCents !== 0) {
     const amt = toEuros(otherIncomeCents);

@@ -24,15 +24,16 @@ const VALID_CIVIL_STATUS: CivilStatus[] = ['single', 'married', 'widowed', 'sepa
 
 const CORRECT_THRESHOLD_PCT = 2; // within 2% → considered correct
 
-/** Annualise a monthly figure × 12, rounded to cents. */
-export function annualise(monthly: number): number {
-  return Math.round(monthly * 12 * 100) / 100;
+/** Annualise a monthly figure using the number of salary payments per year. */
+export function annualise(monthly: number, numberOfPayments = 12): number {
+  return Math.round(monthly * numberOfPayments * 100) / 100;
 }
 
 /** Derive the best estimate for annual gross from extracted nomina data. */
 export function deriveAnnualGross(nomina: NominaData): number {
   if (nomina.annualGross && nomina.annualGross > 0) return nomina.annualGross;
-  if (nomina.monthlyGross && nomina.monthlyGross > 0) return annualise(nomina.monthlyGross);
+  if (nomina.monthlyGross && nomina.monthlyGross > 0)
+    return annualise(nomina.monthlyGross, nomina.numberOfPayments ?? 12);
   return 0;
 }
 
@@ -40,12 +41,41 @@ export function deriveAnnualGross(nomina: NominaData): number {
 export function deriveAnnualRetenciones(nomina: NominaData): number {
   if (nomina.annualRetenciones && nomina.annualRetenciones > 0) return nomina.annualRetenciones;
   if (nomina.monthlyRetenciones && nomina.monthlyRetenciones > 0)
-    return annualise(nomina.monthlyRetenciones);
+    return annualise(nomina.monthlyRetenciones, nomina.numberOfPayments ?? 12);
   // Fallback: derive from percentage × annualised gross
   if (nomina.retentionPercentage && nomina.monthlyGross) {
     const annual = deriveAnnualGross(nomina);
     return Math.round(annual * (nomina.retentionPercentage / 100) * 100) / 100;
   }
+  return 0;
+}
+
+/**
+ * Derive total annual employee SS contributions.
+ * Prefers the sum of detailed breakdown fields; falls back to monthlySSEmployee × payments.
+ */
+export function deriveAnnualSS(nomina: NominaData): number {
+  const n = nomina.numberOfPayments ?? 12;
+
+  // Sum detailed breakdown if any breakdown field is present
+  const hasBreakdown =
+    nomina.monthlySS_CC !== undefined ||
+    nomina.monthlySS_MEI !== undefined ||
+    nomina.monthlySS_unemployment !== undefined ||
+    nomina.monthlySS_vocational !== undefined;
+
+  if (hasBreakdown) {
+    const monthly =
+      (nomina.monthlySS_CC ?? 0) +
+      (nomina.monthlySS_MEI ?? 0) +
+      (nomina.monthlySS_unemployment ?? 0) +
+      (nomina.monthlySS_vocational ?? 0);
+    return annualise(monthly, n);
+  }
+
+  if (nomina.monthlySSEmployee && nomina.monthlySSEmployee > 0)
+    return annualise(nomina.monthlySSEmployee, n);
+
   return 0;
 }
 
@@ -156,6 +186,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
 
       const annualGross = deriveAnnualGross(nomina);
       const annualRetencionesNomina = deriveAnnualRetenciones(nomina);
+      const annualSS = deriveAnnualSS(nomina);
 
       // Override fiscalYear from nomina if detected
       if (nomina.fiscalYear) fiscalYear = nomina.fiscalYear;
@@ -167,6 +198,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
         age,
         civilStatus,
         grossSalary: annualGross > 0 ? annualGross : undefined,
+        ssContributions: annualSS > 0 ? annualSS : undefined,
         retenciones: annualRetencionesNomina > 0 ? annualRetencionesNomina : undefined,
         dependentsUnder25: 0,
         dependentsOver65: 0,
@@ -192,6 +224,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
             age,
             civilStatus,
             grossSalary: annualGross,
+            ssContributions: annualSS > 0 ? annualSS : undefined,
             retenciones: annualRetencionesNomina,
             dependentsUnder25: 0,
             dependentsOver65: 0,

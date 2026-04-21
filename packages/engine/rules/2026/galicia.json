@@ -1,0 +1,22 @@
+{
+  "region": "galicia",
+  "fiscalYear": 2026,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 12985,  "rate": 0.09   },
+    { "from": 12985,  "to": 21068,  "rate": 0.1165 },
+    { "from": 21068,  "to": 35200,  "rate": 0.149  },
+    { "from": 35200,  "to": 47600,  "rate": 0.184  },
+    { "from": 47600,  "to": 60000,  "rate": 0.225  },
+    { "from": 60000,  "to": null,   "rate": 0.225  }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

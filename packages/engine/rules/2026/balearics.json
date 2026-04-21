@@ -1,0 +1,25 @@
+{
+  "region": "balearics",
+  "fiscalYear": 2026,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 10000,  "rate": 0.09   },
+    { "from": 10000,   "to": 18000,  "rate": 0.1125 },
+    { "from": 18000,   "to": 30000,  "rate": 0.1425 },
+    { "from": 30000,   "to": 48000,  "rate": 0.175  },
+    { "from": 48000,   "to": 70000,  "rate": 0.19   },
+    { "from": 70000,   "to": 90000,  "rate": 0.2175 },
+    { "from": 90000,   "to": 120000, "rate": 0.2275 },
+    { "from": 120000,  "to": 175000, "rate": 0.2375 },
+    { "from": 175000,  "to": null,   "rate": 0.2475 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

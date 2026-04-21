@@ -1,0 +1,22 @@
+{
+  "region": "cantabria",
+  "fiscalYear": 2026,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 13000,  "rate": 0.085 },
+    { "from": 13000,  "to": 21000,  "rate": 0.11  },
+    { "from": 21000,  "to": 35200,  "rate": 0.145 },
+    { "from": 35200,  "to": 60000,  "rate": 0.18  },
+    { "from": 60000,  "to": 90000,  "rate": 0.225 },
+    { "from": 90000,  "to": null,   "rate": 0.245 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

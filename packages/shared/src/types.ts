@@ -2,7 +2,11 @@ export interface TaxInput {
   fiscalYear: number;           // e.g. 2024
   region: SpanishRegion;        // see type below
   age: number;                  // affects mínimo personal
-  grossSalary: number;          // euros, rendimientos del trabajo
+  grossSalary: number;          // euros, rendimientos del trabajo (rendimiento íntegro)
+  /** Annual employee Social Security contributions (Art. 19 LIRPF gastos deducibles).
+   *  Includes Contingencias Comunes, MEI, Desempleo, and Formación Profesional.
+   *  Subtracted from grossSalary before the Art. 20 trabajo reduction is applied. */
+  ssContributions?: number;
   otherIncome?: number;         // rendimientos del capital, etc.
   retenciones: number;          // withholdings already paid
   dependentsUnder25: number;    // children under 25 in household
@@ -79,17 +83,31 @@ export interface NominaData {
   period?: string;
   /** Fiscal year inferred from the period */
   fiscalYear?: number;
+  /** Number of salary payments per year (typically 12 or 14). Default 12. */
+  numberOfPayments?: number;
   /** Total devengado (gross earnings) for this pay period, in euros */
   monthlyGross?: number;
   /** Annual gross stated explicitly in the nómina (some show acumulado), in euros */
   annualGross?: number;
-  /** IRPF withholding amount deducted this pay period, in euros */
+  /** IRPF withholding amount deducted this pay period (Concept 999 / Tributación IRPF), in euros */
   monthlyRetenciones?: number;
   /** IRPF withheld year-to-date / annual (if stated in nómina), in euros */
   annualRetenciones?: number;
   /** IRPF retention rate applied, as a percentage (e.g. 15.5 means 15.5%) */
   retentionPercentage?: number;
-  /** Employee Social Security contributions deducted this pay period, in euros */
+  /**
+   * Employee Social Security contributions this pay period — individual breakdown.
+   * Art. 19.2.a LIRPF: these are gastos deducibles and reduce the taxable base.
+   */
+  /** Contingencias Comunes employee contribution, in euros */
+  monthlySS_CC?: number;
+  /** MEI (Mecanismo de Equidad Intergeneracional), in euros */
+  monthlySS_MEI?: number;
+  /** Desempleo (unemployment) employee contribution, in euros */
+  monthlySS_unemployment?: number;
+  /** Formación Profesional employee contribution, in euros */
+  monthlySS_vocational?: number;
+  /** Total employee SS (sum of above four, or directly stated), in euros */
   monthlySSEmployee?: number;
 }
 

@@ -10,7 +10,7 @@
 
 **Why it matters:** Agencia Tributaria tools are cumbersome. Private gestorías are expensive for simple salary earners. We make tax transparency accessible.
 
-**Fiscal year target:** 2024 (Renta 2024, declared in 2025). The engine must be swappable for future years without code changes.
+**Fiscal year support:** 2024 and 2025 (Ley 5/2025). The engine loads rules from JSON files — adding a new year requires only a new `engine/rules/{year}/` directory, no code changes.
 
 ---
 
@@ -33,19 +33,18 @@ If the AI ever suggests a tax figure, the system is compromised. The AI only des
 
 ## 3. Tech Stack
 
-| Layer | Technology | Reason |
+| Layer | Technology | Notes |
 |---|---|---|
-| Backend runtime | Node.js 20 LTS + TypeScript | Type safety for financial arithmetic |
-| Backend framework | Fastify | Low overhead, schema validation built-in |
-| AI SDK | `@anthropic-ai/sdk` latest | Claude claude-sonnet-4-6 access |
-| Frontend | React 18 + TypeScript + Vite | Component model fits the waterfall chart |
-| Styling | Tailwind CSS | Rapid, consistent UI |
-| Charts | Recharts | Composable waterfall / bar charts |
+| Backend runtime | Node.js 22 + TypeScript | `.nvmrc` pins to `22`. Strict mode throughout. |
+| Package manager | pnpm (workspace) | `pnpm-workspace.yaml` defines `packages/*` and `apps/*` |
+| Backend framework | Fastify 4 | Low overhead, schema validation built-in |
+| AI SDK | `@anthropic-ai/sdk ^0.27` | Claude claude-sonnet-4-6 access |
+| Frontend | React 19 + TypeScript + Vite | Component model fits the waterfall chart |
+| Styling | Tailwind CSS v4 | Rapid, consistent UI |
+| Charts | Recharts 2 | Composable waterfall / bar / pie charts |
 | Tax rules storage | JSON files under `engine/rules/` | Swappable per fiscal year without code changes |
-| Testing | Vitest (backend + frontend) | Unified test runner |
-| Monorepo layout | `packages/` with shared types | Single source of truth for data contracts |
-
-**Node version:** `>=20.0.0`. Enforce with `.nvmrc`.
+| Testing | Vitest (backend + frontend) | Unified test runner across all packages |
+| PDF parsing | `pdf-parse` v1 | Text extraction from nómina PDFs |
 
 ---
 
@@ -54,82 +53,114 @@ If the AI ever suggests a tax figure, the system is compromised. The AI only des
 ```
 taxai/
 ├── CLAUDE.md                        ← you are here
+├── .nvmrc                           ← pins Node 22
+├── .env.example                     ← ANTHROPIC_API_KEY, PORT
+├── pnpm-workspace.yaml              ← workspace definition
+├── tsconfig.base.json               ← shared TS config (NodeNext, ESM, strict)
+├── package.json                     ← workspace root (scripts: dev:api, dev:ui, test, build)
 ├── packages/
-│   ├── shared/                      ← shared TypeScript types and schemas
+│   ├── shared/                      ← shared TypeScript types — neither agent changes unilaterally
 │   │   └── src/
-│   │       ├── types.ts             ← TaxInput, TaxResult, TaxBreakdown
+│   │       ├── types.ts             ← TaxInput, TaxResult, WaterfallStep, NominaData, NominaComparison, NominaParseResult
 │   │       └── index.ts
-│   ├── engine/                      ← AGENT A OWNS THIS
+│   ├── engine/                      ← deterministic tax engine, no AI
 │   │   ├── src/
-│   │   │   ├── calculator.ts        ← main entry point
-│   │   │   ├── brackets.ts          ← progressive bracket logic
-│   │   │   ├── minimums.ts          ← mínimo personal y familiar
-│   │   │   ├── reductions.ts        ← rendimientos del trabajo reductions
-│   │   │   └── types.ts
+│   │   │   ├── index.ts             ← exports: calculate()
+│   │   │   ├── calculator.ts        ← main entry point, orchestrates all steps
+│   │   │   ├── brackets.ts          ← progressive bracket application (returns cents)
+│   │   │   ├── minimums.ts          ← mínimo personal y familiar (Art. 57–61 LIRPF)
+│   │   │   ├── reductions.ts        ← rendimientos del trabajo reductions (2024 + 2025)
+│   │   │   └── types.ts             ← Bracket, TrabajoReductions, RegionRules, StateRules
 │   │   ├── rules/
 │   │   │   ├── 2024/
-│   │   │   │   ├── state.json       ← tramos estatales
+│   │   │   │   ├── state.json       ← tramos estatales 2024
 │   │   │   │   ├── madrid.json
 │   │   │   │   ├── catalonia.json
-│   │   │   │   ├── andalusia.json
-│   │   │   │   └── ...              ← one file per autonomía
-│   │   │   └── 2025/                ← drop new year files here to update
+│   │   │   │   └── ...              ← one file per autonomía (17 total)
+│   │   │   └── 2025/                ← all 17 regions + state, Ley 5/2025 rules
+│   │   │       ├── state.json
+│   │   │       ├── madrid.json
+│   │   │       └── ...
 │   │   └── tests/
-│   ├── ai-layer/                    ← AGENT A OWNS THIS
+│   │       ├── integration.test.ts  ← comprehensive 2025 parity tests (40+ cases)
+│   │       ├── madrid.test.ts
+│   │       ├── catalonia.test.ts
+│   │       ├── regions.test.ts
+│   │       └── edge-cases.test.ts
+│   ├── ai-layer/                    ← AI wrappers — three thin Claude calls
 │   │   ├── src/
-│   │   │   ├── extractor.ts         ← chat → TaxInput JSON
-│   │   │   ├── explainer.ts         ← TaxResult → plain Spanish prose
-│   │   │   └── prompts.ts           ← all Claude prompt templates
+│   │   │   ├── index.ts             ← exports: extractTaxInput, explainResult, parseNomina
+│   │   │   ├── extractor.ts         ← chat message → Partial<TaxInput> (tool-use, PII guard)
+│   │   │   ├── explainer.ts         ← TaxResult + question → Spanish prose (no new numbers)
+│   │   │   ├── nomina-parser.ts     ← PDF text → NominaData (tool-use)
+│   │   │   └── prompts.ts           ← EXTRACTOR_SYSTEM_PROMPT, EXPLAINER_SYSTEM_PROMPT, NOMINA_PARSER_SYSTEM_PROMPT
 │   │   └── tests/
+│   │       ├── extractor.test.ts
+│   │       └── nomina-parser.test.ts
 ├── apps/
-│   ├── api/                         ← AGENT A OWNS THIS
+│   ├── api/                         ← Fastify HTTP server
 │   │   ├── src/
-│   │   │   ├── server.ts
+│   │   │   ├── server.ts            ← registers plugins (CORS, multipart, static), SPA fallback
+│   │   │   ├── ratelimit.ts         ← in-memory RateLimiter (20 req/min per IP for AI routes)
 │   │   │   └── routes/
 │   │   │       ├── calculate.ts     ← POST /api/calculate
-│   │   │       ├── explain.ts       ← POST /api/explain
-│   │   │       └── extract.ts       ← POST /api/extract
+│   │   │       ├── extract.ts       ← POST /api/extract  (rate-limited)
+│   │   │       ├── explain.ts       ← POST /api/explain  (rate-limited)
+│   │   │       └── parse-nomina.ts  ← POST /api/parse-nomina (multipart/form-data, rate-limited)
 │   │   └── tests/
-│   └── web/                         ← AGENT B OWNS THIS
+│   │       └── parse-nomina.test.ts
+│   └── web/                         ← React 19 SPA, served as static by the API in production
 │       ├── src/
+│       │   ├── App.tsx              ← three-tab layout: form / chat / nómina
+│       │   ├── main.tsx
 │       │   ├── components/
-│       │   │   ├── InputForm.tsx    ← traditional form path
-│       │   │   ├── ChatInput.tsx    ← chat path
-│       │   │   ├── ResultDashboard.tsx
-│       │   │   ├── WaterfallChart.tsx
-│       │   │   └── ExplanationPanel.tsx
+│       │   │   ├── InputForm.tsx         ← field-by-field form, all TaxInput fields
+│       │   │   ├── ChatInput.tsx         ← free-text → extract → confirm → calculate
+│       │   │   ├── NominaUpload.tsx      ← PDF upload, extracted data, IRPF comparison card
+│       │   │   ├── ResultDashboard.tsx   ← hero card (a ingresar/devolver) + breakdown grid
+│       │   │   ├── WaterfallChart.tsx    ← Recharts bar chart per WaterfallStep
+│       │   │   ├── TaxBreakdownCharts.tsx ← KPI cards, donut (net vs tax), bar (state vs regional)
+│       │   │   └── ExplanationPanel.tsx  ← Q&A text area → calls /api/explain
 │       │   ├── api/
-│       │   │   └── taxai.ts         ← typed fetch calls to backend
-│       │   └── App.tsx
+│       │   │   └── taxai.ts         ← typed fetch wrappers (calculate, extract, explain, parseNomina)
+│       │   └── mocks/
+│       │       └── taxResult.ts     ← hardcoded MOCK_RESULT for local dev
 │       └── tests/
-├── docs/                            ← project documentation
-│   ├── INTEGRATION.md
-│   ├── TASKS.md
-│   ├── START_PROMPT.md
-│   └── TAX_RULES_2025.md
-└── package.json                     ← workspace root
+│           ├── ResultDashboard.test.tsx
+│           ├── WaterfallChart.test.tsx
+│           └── setup.ts
+├── docs/
+│   ├── TAX_RULES_2025.md            ← authoritative IRPF 2025 reference (brackets, formulas, sources)
+│   ├── TASKS.md                     ← Agent B frontend roadmap
+│   ├── INTEGRATION.md               ← integration sprint notes
+│   └── START_PROMPT.md              ← initial agent briefing
+└── ...
 ```
 
 ---
 
 ## 5. Shared Data Contracts (Critical — Both Agents Must Respect These)
 
-These types live in `packages/shared/src/types.ts`. Neither agent may change them unilaterally — coordinate first.
+These types live in `packages/shared/src/types.ts`. **Neither agent may change them unilaterally — coordinate first.**
 
 ### TaxInput (the contract between UI/AI and the Engine)
 
 ```typescript
 export interface TaxInput {
-  fiscalYear: number;           // e.g. 2024
-  region: SpanishRegion;        // see enum below
-  age: number;                  // affects mínimo personal
-  grossSalary: number;          // euros, rendimientos del trabajo
-  otherIncome?: number;         // rendimientos del capital, etc.
-  retenciones: number;          // withholdings already paid
-  dependentsUnder25: number;    // children under 25 in household
-  dependentsOver65: number;     // elderly dependents
+  fiscalYear: number;             // e.g. 2025
+  region: SpanishRegion;          // see type below
+  age: number;                    // affects mínimo personal
+  grossSalary: number;            // euros, rendimiento íntegro del trabajo
+  /** Annual employee SS contributions (Art. 19.2.a LIRPF gastos deducibles).
+   *  Subtracted before the Art. 20 trabajo reduction is applied. */
+  ssContributions?: number;
+  otherIncome?: number;           // rendimientos del capital, etc.
+  retenciones: number;            // withholdings already paid
+  dependentsUnder25: number;      // children under 25 in household
+  dependentsUnder3?: number;      // subset of above who are under 3 (supplement)
+  dependentsOver65: number;       // elderly dependents (ascendants)
   civilStatus: CivilStatus;
-  disability?: DisabilityGrade; // 33% or 65%+
+  disability?: DisabilityGrade;   // 33% or 65%+
 }
 
 export type SpanishRegion =
@@ -142,6 +173,8 @@ export type CivilStatus = 'single' | 'married' | 'widowed' | 'separated';
 export type DisabilityGrade = 33 | 65;
 ```
 
+> **Foral caveat:** `navarra` and `pais-vasco` are valid `SpanishRegion` values but use completely different tax legislation. The API currently returns `501 Not Implemented` for these two regions.
+
 ### TaxResult (what the Engine returns)
 
 ```typescript
@@ -150,27 +183,27 @@ export interface TaxResult {
   region: SpanishRegion;
   grossSalary: number;
 
-  // Reductions applied
-  rendimientoNetoReducido: number;   // after trabajo reductions
-  baseImponibleGeneral: number;
-  minimumPersonalFamiliar: number;
+  // Deductions & reductions applied
+  rendimientoNetoReducido: number;   // after SS gastos + trabajo reduction
+  baseImponibleGeneral: number;      // rendimientoNetoReducido + otherIncome
+  minimumPersonalFamiliar: number;   // mínimo personal y familiar (Art. 57–61)
 
-  // Split between state and regional
+  // Cuota íntegra — each tarifa applied to the FULL base independently
   cuotaIntegraEstatal: number;
   cuotaIntegraAutonomica: number;
   cuotaIntegraTOTAL: number;
 
-  // Applied to minimum
+  // Cuota líquida — after subtracting minimum quotas and 2025 deduction
   cuotaLiquidaEstatal: number;
   cuotaLiquidaAutonomica: number;
   cuotaLiquidaTOTAL: number;
 
   // Final result
   retenciones: number;
-  resultAmount: number;       // positive = to pay (a ingresar), negative = refund (a devolver)
+  resultAmount: number;    // positive = to pay (a ingresar), negative = refund (a devolver)
   resultType: 'a_ingresar' | 'a_devolver' | 'cero';
 
-  // Waterfall data for the chart (ordered)
+  // Waterfall data for the chart (ordered steps)
   waterfallSteps: WaterfallStep[];
 }
 
@@ -182,98 +215,158 @@ export interface WaterfallStep {
 }
 ```
 
+### Nómina parsing types
+
+```typescript
+export interface NominaData {
+  period?: string;                // e.g. "enero 2025" or "12/2024"
+  fiscalYear?: number;
+  numberOfPayments?: number;      // typically 12 or 14
+  monthlyGross?: number;
+  annualGross?: number;
+  monthlyRetenciones?: number;
+  annualRetenciones?: number;
+  retentionPercentage?: number;
+  monthlySS_CC?: number;          // Contingencias Comunes
+  monthlySS_MEI?: number;         // MEI
+  monthlySS_unemployment?: number;
+  monthlySS_vocational?: number;
+  monthlySSEmployee?: number;     // total employee SS (sum of above)
+}
+
+export interface NominaComparison {
+  calculatedTax: number;           // engine cuotaLiquidaTOTAL
+  retencionesFromNomina: number;   // annualised from the nómina
+  difference: number;              // retencionesFromNomina - calculatedTax
+  diffType: 'overpaid' | 'underpaid' | 'correct';  // correct = within 2%
+  percentageDiff: number;
+}
+
+export interface NominaParseResult {
+  nomina: NominaData;
+  taxInput: Partial<TaxInput>;
+  annualGross: number;
+  annualRetencionesNomina: number;
+  taxResult?: TaxResult;          // present if enough data available
+  comparison?: NominaComparison;  // present when taxResult is present
+}
+```
+
 ### API Endpoints Contract
 
 ```
 POST /api/calculate
-  Body:  TaxInput
+  Body:    TaxInput
   Returns: TaxResult
+  Errors:  400 (validation), 501 (foral region), 422 (missing rules), 500
 
 POST /api/extract
-  Body:  { message: string }  ← raw chat text, NO PII
-  Returns: Partial<TaxInput>  ← AI-extracted fields, user confirms
+  Body:    { message: string }   ← raw chat text, max 2000 chars, NO PII
+  Returns: Partial<TaxInput>     ← only fields the user mentioned
+  Errors:  400 (PII detected), 429 (rate limit), 500
+  Limit:   20 req/min per IP
 
 POST /api/explain
-  Body:  { result: TaxResult, question: string }
-  Returns: { explanation: string }  ← plain Spanish prose, no new numbers
+  Body:    { result: TaxResult, question: string }
+  Returns: { explanation: string }  ← Spanish prose, no new numbers
+  Errors:  429 (rate limit), 500
+  Limit:   20 req/min per IP
+
+POST /api/parse-nomina
+  Body:    multipart/form-data
+           - pdf: <file>          max 10 MB
+           - region?: string      default "madrid"
+           - age?: number         default 30
+           - civilStatus?: string default "single"
+           - fiscalYear?: number  default 2025
+  Returns: NominaParseResult
+  Errors:  400 (no file / bad PDF), 501 (foral), 429 (rate limit), 500
+  Limit:   20 req/min per IP (shared aiRateLimiter)
 ```
 
 ---
 
-## 6. Agent Responsibilities
+## 6. Engine Implementation (How the Calculator Works)
 
-### Agent A — Backend & AI Layer
+All arithmetic in `packages/engine/src/calculator.ts`. All values are integers (cents) until the final `toEuros()` conversion.
 
-**Owns:** `packages/engine/`, `packages/ai-layer/`, `apps/api/`
+**Step sequence:**
 
-**First milestone:** Implement the full tax calculation for **Madrid** and **Catalonia** as the two baseline regions. All 17 regions follow after these two pass parity tests.
+1. Load `rules/{fiscalYear}/state.json` and `rules/{fiscalYear}/{region}.json`
+2. **Art. 19 gastos deducibles** — subtract employee SS contributions from gross salary
+3. **Art. 20 reducción por rendimientos del trabajo** — applied to `(grossSalary - SS)`:
+   - *2025 (Ley 5/2025)*: €2,000 flat + two-segment phase-out (see Section 8)
+   - *2024 legacy*: single linear phase-out from threshold to €19,747
+4. `rendimientoNetoReducido = max(0, gross - SS - trabajoReduction)`
+5. `baseImponibleGeneral = rendimientoNetoReducido + otherIncome`
+6. `minimumPersonalFamiliar` = base €5,550 + age supplements + descendants + ascendants (see Section 8)
+7. **Cuota íntegra** — apply each tarifa to the **full** `baseImponibleGeneral` independently:
+   - `cuotaIntegraEstatal` = state brackets applied to full base
+   - `cuotaIntegraAutonomica` = regional brackets applied to full base
+   > ⚠️ This is NOT a 50/50 split. Each tarifa has its own rates and each is applied to the complete base.
+8. Apply each tarifa to the **full** `minimumPersonalFamiliar` to get minimum quotas
+9. `cuotaLiquida = max(0, cuotaIntegra - minQuota)` for each half
+10. **2025 only — Deducción por rendimientos del trabajo** (up to €340, phases out €16,576–€18,276): subtract from cuota líquida 50/50 state/regional
+11. `resultAmount = cuotaLiquidaTOTAL - retenciones`
 
-**Engine implementation order:**
-1. Load rules from `engine/rules/{year}/{region}.json`
-2. Calculate `rendimientoNetoReducido` (apply trabajo reductions: min €2,000, up to €5,565 for low earners)
-3. Calculate `minimumPersonalFamiliar` (base €5,550, +€1,150 if age ≥65, +€1,400 if age ≥75)
-4. Apply dependents minimum (+€2,400 first child, +€2,700 second, +€4,000 third+; +€1,000 each if under 3)
-5. Split `baseImponibleGeneral` between state (50%) and regional (50%) tramos
-6. Apply progressive brackets to each half
-7. Subtract minimum quotas from each half
-8. Sum and subtract retenciones → final result
-
-**Parity test requirement:** Each region must match Agencia Tributaria's official simulator to the cent for at least 5 test cases before that region is considered done.
-
-**AI Layer — extractor.ts:**
-- Model: `claude-sonnet-4-6`
-- Input: raw user message string
-- Output: `Partial<TaxInput>` (only fields the user mentioned)
-- Must use a structured output / tool-use call so the response is always valid JSON
-- Never ask for or forward name, DNI, address, or bank info
-
-**AI Layer — explainer.ts:**
-- Input: `TaxResult` + user's question string
-- Output: plain Spanish explanation referencing actual `waterfallSteps` from the result
-- Must not introduce any number not already present in `TaxResult`
-- Keep responses under 250 words unless the question is complex
-
-### Agent B — Frontend
-
-**Owns:** `apps/web/`
-
-**First milestone:** Build the **Results Dashboard** as a static component using hardcoded mock `TaxResult` data. This is the core value proposition and must be pixel-perfect before connecting the API.
-
-**Dashboard requirements:**
-- Hero card: large "A Ingresar / A Devolver" amount, color-coded (red = pay, green = refund)
-- Waterfall chart: each `WaterfallStep` as a labeled bar
-- User must understand their status within 5 seconds (scannability rule)
-- Mobile-first responsive layout
-
-**Input paths (build in parallel or sequentially):**
-1. `InputForm.tsx` — traditional labeled form, field-by-field
-2. `ChatInput.tsx` — free-text chat box that calls `POST /api/extract`, shows extracted fields for user confirmation before calculating
-
-**Explanation panel:**
-- Rendered below the dashboard after first calculation
-- Text area for follow-up questions → calls `POST /api/explain`
-- Display AI response as formatted prose (no markdown tables)
-
-**API calls (`src/api/taxai.ts`):**
-- Typed wrappers around fetch using the `TaxInput`/`TaxResult` types from `packages/shared`
-- Handle loading states and error messages in Spanish
+**Parity requirement:** Each region must match the AEAT official simulator to the cent for at least 5 test cases before that region ships.
 
 ---
 
-## 7. Tax Rules JSON Schema
+## 7. AI Layer
 
-Each file in `engine/rules/{year}/{region}.json` must follow this schema:
+**extractor.ts** (`extractTaxInput(message, client?)`):
+- Model: `claude-sonnet-4-6`, tool-use (structured output)
+- PII guard: rejects input matching DNI/NIE/IBAN patterns, throws `PiiDetectedError`
+- Returns only fields the user mentioned; unmentioned fields are `undefined`
 
+**explainer.ts** (`explainResult(result, question, client?)`):
+- Model: `claude-sonnet-4-6`, text response
+- Must not introduce any number not already in `TaxResult`
+- Max ~250 words, plain Spanish prose
+
+**nomina-parser.ts** (`parseNomina(pdfText, client?)`):
+- Model: `claude-sonnet-4-6`, tool-use (structured output)
+- Input: raw text extracted from PDF by `pdf-parse` (caller extracts text)
+- Output: `NominaData` — financial fields only, no PII
+- Caller (`parse-nomina.ts` route) then derives annual figures and runs `calculate()`
+
+**prompts.ts** — three system prompts:
+- `EXTRACTOR_SYSTEM_PROMPT` — strict PII rules, extract only what user mentioned
+- `EXPLAINER_SYSTEM_PROMPT` — reference only provided JSON, no new figures, Spanish
+- `NOMINA_PARSER_SYSTEM_PROMPT` — extract financial fields only, no PII, no estimation
+
+---
+
+## 8. Tax Rules Reference
+
+### State Tax Brackets (2024 and 2025 — identical)
+
+Applied to the **full** `baseImponibleGeneral` via the state tarifa:
+
+| From (€) | To (€) | Rate |
+|---|---|---|
+| 0 | 12,450 | 9.50% |
+| 12,450 | 20,200 | 12.00% |
+| 20,200 | 35,200 | 15.00% |
+| 35,200 | 60,000 | 18.50% |
+| 60,000 | 300,000 | 22.50% |
+| 300,000 | ∞ | 24.50% |
+
+Regional brackets vary per autonomía. Madrid lowest combined top rate (~42.5%). Catalonia one of the highest (~50%).
+
+### Tax Rules JSON Schema
+
+**`engine/rules/{year}/{region}.json`** — two formats depending on fiscal year:
+
+**2024 format** (`phaseOutStart`/`phaseOutEnd` keys):
 ```json
 {
   "region": "madrid",
   "fiscalYear": 2024,
   "autonomicBrackets": [
-    { "from": 0,      "to": 12450,  "rate": 0.0900 },
-    { "from": 12450,  "to": 17707,  "rate": 0.0900 },
-    { "from": 17707,  "to": 33007,  "rate": 0.1200 },
-    { "from": 33007,  "to": 53407,  "rate": 0.1400 },
-    { "from": 53407,  "to": null,   "rate": 0.1700 }
+    { "from": 0,     "to": 12450, "rate": 0.0900 },
+    { "from": 12450, "to": null,  "rate": 0.1700 }
   ],
   "trabajoReductions": {
     "fullReductionThreshold": 14852,
@@ -285,64 +378,108 @@ Each file in `engine/rules/{year}/{region}.json` must follow this schema:
 }
 ```
 
-`state.json` follows the same bracket schema for the state (estatal) half.
+**2025 format** (two-segment phase-out per Ley 5/2025):
+```json
+{
+  "region": "madrid",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,     "to": 13362, "rate": 0.0850 },
+    { "from": 13362, "to": null,  "rate": 0.2050 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}
+```
 
-**To update for a new fiscal year:** add a new `engine/rules/2025/` directory with updated JSON files. No code changes required.
+`state.json` uses `stateBrackets` (not `autonomicBrackets`) and has no `trabajoReductions`.
+
+**Engine auto-detects** which formula to use: presence of `phaseOutSegment1End` → 2025 path.
+
+### 2025 Reducción por Rendimientos del Trabajo (Art. 20 LIRPF, Ley 5/2025)
+
+```
+rnt = grossSalary − SS − €2,000
+rnt ≤ €14,852              → reducción = €7,302
+€14,852 < rnt ≤ €17,673.52 → reducción = €7,302 − 1.75 × (rnt − €14,852)
+€17,673.52 < rnt < €19,747.50 → reducción = €2,364.34 − 1.14 × (rnt − €17,673.52)
+rnt ≥ €19,747.50           → reducción = €0
+Total deduction = €2,000 (flat) + reducción
+```
+
+### 2025 Mínimo Personal y Familiar (Art. 57–61 LIRPF)
+
+| Item | Amount |
+|---|---|
+| Personal base | €5,550 |
+| Age 65–74 supplement | +€1,150 |
+| Age ≥75 supplement | +€1,400 (additional, on top of 65+) |
+| 1st child under 25 | €2,400 |
+| 2nd child | €2,700 |
+| 3rd child | €4,000 |
+| 4th child+ | €4,500 each |
+| Child under 3 supplement | +€2,800 per child |
+| Ascendant over 65 | €1,150 each |
+
+### 2025 Deducción por Rendimientos del Trabajo (new, from cuota)
+
+Up to €340 subtracted from cuota líquida after minimum deduction, split 50/50 state/regional:
+- Gross ≤ €16,576 → full €340 deduction
+- €16,576 < gross ≤ €18,276 → linearly phases out
+- Gross > €18,276 → €0 deduction
 
 ---
 
-## 8. 2024 State Tax Brackets (Reference)
+## 9. Development Phases (Current Status)
 
-These are the estatal tramos applied to 50% of the base imponible general:
+### Phase 0 — Foundation ✅ COMPLETE
+- [x] Monorepo scaffold (pnpm workspaces), shared types, `state.json` rules files
+- [x] Vite + React + Tailwind scaffold, mock `TaxResult` for dashboard
 
-| From (€) | To (€) | Rate |
-|---|---|---|
-| 0 | 12,450 | 9.50% |
-| 12,450 | 20,200 | 12.00% |
-| 20,200 | 35,200 | 15.00% |
-| 35,200 | 60,000 | 18.50% |
-| 60,000 | 300,000 | 22.50% |
-| 300,000 | ∞ | 24.50% |
+### Phase 1 — MVP Core ✅ COMPLETE
+- [x] Engine for all 15 common-regime regions, parity tests pass, API `/calculate`
+- [x] ResultDashboard + WaterfallChart connected to live `/calculate`
+- [x] InputForm with all TaxInput fields
 
-Regional brackets vary per autonomía. Madrid applies the lowest combined rate (~43.5% top). Catalonia applies one of the highest (~50% top).
+### Phase 2 — AI Integration ✅ COMPLETE
+- [x] `extractor.ts` + `/extract` endpoint with PII guard
+- [x] `explainer.ts` + `/explain` endpoint
+- [x] ChatInput + ExplanationPanel in the frontend
+- [x] `nomina-parser.ts` + `/parse-nomina` endpoint (bonus: PDF nómina upload and IRPF comparison)
+- [x] NominaUpload component with comparison card
+- [x] TaxBreakdownCharts (donut + grouped bar charts)
 
----
+### Phase 3 — Full Regional Coverage ✅ MOSTLY COMPLETE
+- [x] All 17 autonomías have rules JSON for both 2024 and 2025
+- [x] Parity tests for all 15 common-regime regions
+- [ ] Navarra and País Vasco (foral régimen — different legislation, currently return 501)
 
-## 9. Development Phases
-
-### Phase 0 — Foundation (both agents in parallel)
-- [ ] Agent A: monorepo scaffold, shared types, `state.json` rules file
-- [ ] Agent B: Vite + React + Tailwind scaffold, mock `TaxResult` for dashboard
-
-### Phase 1 — MVP Core
-- [ ] Agent A: Engine for Madrid + Catalonia, parity tests pass, API server with `/calculate`
-- [ ] Agent B: ResultDashboard + WaterfallChart connected to live `/calculate`
-
-### Phase 2 — AI Integration
-- [ ] Agent A: `extractor.ts` prompt + `/extract` endpoint
-- [ ] Agent A: `explainer.ts` prompt + `/explain` endpoint
-- [ ] Agent B: ChatInput component + ExplanationPanel
-
-### Phase 3 — Full Regional Coverage
-- [ ] Agent A: all 17 autonomías rules JSON + parity tests
-- [ ] Agent B: region selector UX improvements
-
-### Phase 4 — Hardening
-- [ ] Error handling, edge cases (salary = 0, very high earners, multiple dependents)
+### Phase 4 — Hardening 🔄 IN PROGRESS
+- [x] Rate limiting on AI endpoints (20 req/min per IP, in-memory)
+- [x] Spanish error messages throughout
+- [x] Edge cases tested: salary=0, high earners, max dependents
 - [ ] Accessibility audit (WCAG 2.1 AA)
-- [ ] Rate limiting on AI endpoints to control API cost
+- [ ] Multi-process rate limiting (current impl is single-process only)
 
 ---
 
 ## 10. Coding Conventions
 
-- **Language:** TypeScript strict mode (`"strict": true`). No `any`.
+- **Language:** TypeScript strict mode (`"strict": true`). No `any`. ESM throughout (`"module": "NodeNext"`).
 - **Currency arithmetic:** Always use integers (cents) internally. Convert to euros only for display. `Math.round()` at each bracket boundary to avoid floating-point drift.
-- **Comments:** Only where the tax logic is non-obvious (e.g., why a specific reduction phases out). Don't comment self-evident code.
+- **Comments:** Only where tax logic is non-obvious (e.g., why a specific reduction phases out). Don't comment self-evident code.
 - **Error messages:** User-facing errors must be in Spanish. Internal/log errors in English.
-- **Environment variables:** `ANTHROPIC_API_KEY` via `.env` (never committed). Use `dotenv` in the API server.
-- **Commits:** `feat:`, `fix:`, `test:`, `chore:` prefixes. Reference the phase (e.g., `feat(engine): add Catalonia brackets [Phase 1]`).
-- **No premature abstraction:** Don't build a generic "European tax engine." Build the Spanish IRPF engine.
+- **Environment variables:** `ANTHROPIC_API_KEY` and `PORT` via `.env` (never committed). `dotenv` in API server.
+- **Commits:** `feat:`, `fix:`, `test:`, `chore:` prefixes. Reference the feature area (e.g., `feat(engine): add Catalonia 2025 brackets`).
+- **No premature abstraction:** Build the Spanish IRPF engine, not a generic European tax framework.
 
 ---
 
@@ -350,11 +487,13 @@ Regional brackets vary per autonomía. Madrid applies the lowest combined rate (
 
 | Risk | Mitigation |
 |---|---|
-| AI inventing tax figures | Explainer prompt explicitly instructs: "only reference numbers from the provided TaxResult JSON. Do not calculate." |
-| Regional rule errors | Parity tests against official AT simulator are mandatory before shipping |
-| PII leaking to Claude API | `extractor.ts` must strip/reject input containing patterns matching DNI, NIE, or IBAN before calling the API |
-| Floating-point errors in tax math | Use integer cents internally; test all bracket boundaries explicitly |
-| Outdated rules | Rules are JSON, not code — update the JSON file for the new year |
+| AI inventing tax figures | Explainer prompt: "only reference numbers from the provided TaxResult JSON. Do not calculate." |
+| Regional rule errors | Parity tests against official AEAT simulator mandatory before shipping each region |
+| PII leaking to Claude API | `extractor.ts` rejects input matching DNI/NIE/IBAN regex before calling the API |
+| Floating-point errors in tax math | Integer cents internally; bracket boundaries tested explicitly |
+| Outdated rules | Rules are JSON not code — add a new `rules/{year}/` directory to update |
+| Rate limit bypass in multi-process | `RateLimiter` is in-memory; a load balancer would require Redis or similar |
+| Foral region requests | Navarra/País Vasco return 501 — do not attempt to compute with common-regime brackets |
 
 ---
 
@@ -365,7 +504,8 @@ Regional brackets vary per autonomía. Madrid applies the lowest combined rate (
 - Rental income (rendimientos del capital inmobiliario)
 - Mortgage deduction (comunidades that still support it)
 - Pension plan contributions
-- PDF export of the breakdown
+- PDF export of the tax breakdown (the nómina *input* parser exists; the tax *output* PDF export does not)
 - Multi-year comparison
+- Foral régimen full implementation (Navarra + País Vasco)
 
-Do not design for these now. The architecture supports them naturally because the Engine is rule-based and the AI layer is stateless.
+The architecture supports these naturally: the Engine is rule-based, the AI layer is stateless, and the shared type contract can be extended.

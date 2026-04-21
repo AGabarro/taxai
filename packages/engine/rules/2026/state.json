@@ -1,0 +1,12 @@
+{
+  "region": "state",
+  "fiscalYear": 2026,
+  "stateBrackets": [
+    { "from": 0,      "to": 12450,  "rate": 0.0950 },
+    { "from": 12450,  "to": 20200,  "rate": 0.1200 },
+    { "from": 20200,  "to": 35200,  "rate": 0.1500 },
+    { "from": 35200,  "to": 60000,  "rate": 0.1850 },
+    { "from": 60000,  "to": 300000, "rate": 0.2250 },
+    { "from": 300000, "to": null,   "rate": 0.2450 }
+  ]
+}

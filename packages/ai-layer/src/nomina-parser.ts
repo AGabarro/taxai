@@ -11,35 +11,55 @@ const PARSE_NOMINA_TOOL: Tool = {
     properties: {
       period: {
         type: 'string',
-        description: 'Período de liquidación de la nómina, ej. "enero 2025" o "12/2024"',
+        description: 'Período de liquidación, ej. "enero 2025" o "12/2024"',
       },
       fiscalYear: {
         type: 'integer',
-        description: 'Año fiscal al que corresponde la nómina',
+        description: 'Año fiscal al que corresponde la nómina (ej. 2025)',
+      },
+      numberOfPayments: {
+        type: 'integer',
+        description: 'Número de pagas anuales: 14 si hay pagas extras, 12 si no. Omitir si no está claro.',
       },
       monthlyGross: {
         type: 'number',
-        description: 'Total Devengado (salario bruto) del período, en euros',
+        description: 'Total Devengado del período (suma de todos los devengos), en euros',
       },
       annualGross: {
         type: 'number',
-        description: 'Salario bruto anual acumulado si aparece en la nómina, en euros',
+        description: 'Salario bruto anual acumulado si aparece explícitamente en la nómina, en euros',
       },
       monthlyRetenciones: {
         type: 'number',
-        description: 'Importe retenido en concepto de IRPF este período, en euros',
+        description: 'Importe de retención IRPF este período (Concepto 999 / "Tributación I.R.P.F."), en euros',
       },
       annualRetenciones: {
         type: 'number',
-        description: 'Total IRPF retenido acumulado en el año si aparece en la nómina, en euros',
+        description: 'Total IRPF retenido acumulado anual si aparece en la nómina, en euros',
       },
       retentionPercentage: {
         type: 'number',
-        description: 'Porcentaje de retención IRPF aplicado (ej. 15.5 para 15,5%)',
+        description: 'Tipo de retención IRPF aplicado en porcentaje (ej. 15.5 para 15,5%)',
+      },
+      monthlySS_CC: {
+        type: 'number',
+        description: 'Cuota de Contingencias Comunes del trabajador este período, en euros',
+      },
+      monthlySS_MEI: {
+        type: 'number',
+        description: 'Cuota MEI (Mecanismo de Equidad Intergeneracional) del trabajador, en euros',
+      },
+      monthlySS_unemployment: {
+        type: 'number',
+        description: 'Cuota de Desempleo del trabajador este período, en euros',
+      },
+      monthlySS_vocational: {
+        type: 'number',
+        description: 'Cuota de Formación Profesional del trabajador, en euros',
       },
       monthlySSEmployee: {
         type: 'number',
-        description: 'Cuota total del trabajador a la Seguridad Social este período, en euros',
+        description: 'Total cuotas SS del trabajador si no aparecen desglosadas en los campos anteriores, en euros',
       },
     },
     // All fields optional — only extract what's clearly present

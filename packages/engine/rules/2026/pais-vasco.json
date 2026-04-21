@@ -1,0 +1,25 @@
+{
+  "region": "pais-vasco",
+  "fiscalYear": 2026,
+  "_note": "País Vasco is a foral community with its own tax system. The API returns 501 for this region.",
+  "autonomicBrackets": [
+    { "from": 0,       "to": 17720,  "rate": 0.23 },
+    { "from": 17720,   "to": 35440,  "rate": 0.28 },
+    { "from": 35440,   "to": 53160,  "rate": 0.35 },
+    { "from": 53160,   "to": 75910,  "rate": 0.40 },
+    { "from": 75910,   "to": 105130, "rate": 0.45 },
+    { "from": 105130,  "to": 140130, "rate": 0.46 },
+    { "from": 140130,  "to": 204270, "rate": 0.47 },
+    { "from": 204270,  "to": null,   "rate": 0.49 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

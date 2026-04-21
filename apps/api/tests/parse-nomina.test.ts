@@ -15,6 +15,7 @@ import {
   annualise,
   deriveAnnualGross,
   deriveAnnualRetenciones,
+  deriveAnnualSS,
   buildComparison,
 } from '../src/routes/parse-nomina.js';
 import type { NominaData } from '@taxai/shared';
@@ -22,8 +23,12 @@ import type { NominaData } from '@taxai/shared';
 // ── annualise ────────────────────────────────────────────────────────────────
 
 describe('annualise', () => {
-  it('multiplies a monthly figure by 12', () => {
+  it('defaults to 12 payments', () => {
     expect(annualise(1000)).toBe(12000);
+  });
+
+  it('uses numberOfPayments when provided', () => {
+    expect(annualise(1000, 14)).toBe(14000);
   });
 
   it('rounds to cents to avoid floating-point drift', () => {
@@ -44,9 +49,14 @@ describe('deriveAnnualGross', () => {
     expect(deriveAnnualGross(nomina)).toBe(30000);
   });
 
-  it('annualises monthlyGross when annualGross is absent', () => {
+  it('annualises monthlyGross × 12 by default', () => {
     const nomina: NominaData = { monthlyGross: 2300 };
     expect(deriveAnnualGross(nomina)).toBe(27600);
+  });
+
+  it('annualises monthlyGross × 14 when numberOfPayments is 14', () => {
+    const nomina: NominaData = { monthlyGross: 2300, numberOfPayments: 14 };
+    expect(deriveAnnualGross(nomina)).toBe(32200);
   });
 
   it('returns 0 when no gross data is available', () => {
@@ -68,9 +78,14 @@ describe('deriveAnnualRetenciones', () => {
     expect(deriveAnnualRetenciones(nomina)).toBe(5250);
   });
 
-  it('annualises monthlyRetenciones when annual is absent', () => {
+  it('annualises monthlyRetenciones × 12 by default', () => {
     const nomina: NominaData = { monthlyRetenciones: 356.5 };
     expect(deriveAnnualRetenciones(nomina)).toBe(4278);
+  });
+
+  it('annualises monthlyRetenciones × 14 when numberOfPayments is 14', () => {
+    const nomina: NominaData = { monthlyRetenciones: 356.5, numberOfPayments: 14 };
+    expect(deriveAnnualRetenciones(nomina)).toBe(4991);
   });
 
   it('falls back to percentage × annualGross when only percentage is known', () => {
@@ -82,6 +97,50 @@ describe('deriveAnnualRetenciones', () => {
   it('returns 0 when no retention data is available', () => {
     const nomina: NominaData = {};
     expect(deriveAnnualRetenciones(nomina)).toBe(0);
+  });
+});
+
+// ── deriveAnnualSS ───────────────────────────────────────────────────────────
+
+describe('deriveAnnualSS', () => {
+  it('sums SS breakdown fields and annualises by 12', () => {
+    const nomina: NominaData = {
+      monthlySS_CC: 140.00,
+      monthlySS_MEI: 0.51,
+      monthlySS_unemployment: 11.58,
+      monthlySS_vocational: 0.60,
+    };
+    // monthly total = 152.69, × 12 = 1832.28
+    expect(deriveAnnualSS(nomina)).toBe(1832.28);
+  });
+
+  it('annualises SS breakdown × 14 when numberOfPayments is 14', () => {
+    const nomina: NominaData = {
+      monthlySS_CC: 140.00,
+      monthlySS_MEI: 0.51,
+      monthlySS_unemployment: 11.58,
+      monthlySS_vocational: 0.60,
+      numberOfPayments: 14,
+    };
+    // monthly total = 152.69, × 14 = 2137.66
+    expect(deriveAnnualSS(nomina)).toBe(2137.66);
+  });
+
+  it('falls back to monthlySSEmployee when no breakdown present', () => {
+    const nomina: NominaData = { monthlySSEmployee: 154.88 };
+    expect(deriveAnnualSS(nomina)).toBe(1858.56);
+  });
+
+  it('prefers breakdown over monthlySSEmployee when both present', () => {
+    const nomina: NominaData = {
+      monthlySS_CC: 140.00,
+      monthlySSEmployee: 999.99, // should be ignored
+    };
+    expect(deriveAnnualSS(nomina)).toBe(1680); // 140 × 12 only
+  });
+
+  it('returns 0 when no SS data', () => {
+    expect(deriveAnnualSS({})).toBe(0);
   });
 });
 

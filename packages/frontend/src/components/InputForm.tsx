@@ -36,7 +36,7 @@ interface FormState {
 }
 
 const DEFAULT_FORM: FormState = {
-  fiscalYear: '2024',
+  fiscalYear: '2025',
   region: 'madrid',
   age: '',
   grossSalary: '',

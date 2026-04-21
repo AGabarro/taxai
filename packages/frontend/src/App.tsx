@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { TaxResult } from '@taxai/shared'
-import { MOCK_RESULT } from './mocks/taxResult'
 import { ResultDashboard } from './components/ResultDashboard'
 import { WaterfallChart } from './components/WaterfallChart'
 import { InputForm } from './components/InputForm'
@@ -10,9 +9,7 @@ import { ExplanationPanel } from './components/ExplanationPanel'
 type InputTab = 'form' | 'chat'
 
 export default function App() {
-  // Start with mock data so the dashboard is visible during Phase 0 development.
-  // Replace with null and remove MOCK_RESULT import once API is wired up.
-  const [result, setResult] = useState<TaxResult | null>(MOCK_RESULT)
+  const [result, setResult] = useState<TaxResult | null>(null)
   const [activeTab, setActiveTab] = useState<InputTab>('form')
 
   return (
@@ -26,7 +23,7 @@ export default function App() {
             </div>
             <span className="font-semibold text-gray-900 text-lg">Taxai</span>
           </div>
-          <span className="text-gray-400 text-sm">Calculadora IRPF 2024</span>
+          <span className="text-gray-400 text-sm">Calculadora IRPF 2025</span>
         </div>
       </header>
 

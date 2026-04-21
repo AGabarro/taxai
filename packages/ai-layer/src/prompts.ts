@@ -28,6 +28,10 @@ Reglas estrictas:
 - "monthlySS_unemployment": Desempleo del trabajador.
 - "monthlySS_vocational": Formación Profesional del trabajador.
 - "monthlySSEmployee": si los conceptos SS anteriores no aparecen desglosados pero hay un total de cuotas SS del trabajador, usa este campo. Si SÍ aparecen desglosados, omite este campo (se sumará automáticamente).
+- "monthlySalarioBase": el concepto "Salario Base" o "Sueldo Base" puro, sin complementos. Solo si aparece como concepto separado.
+- "monthlyRetribucionEspecie": retribuciones en especie (seguro médico, coche de empresa, tickets guardería…) incluidas en el Total Devengado. Solo si aparecen explícitamente como especie.
+- "monthlyDietas": dietas y asignaciones para gastos (manutención, transporte, viaje). Solo si aparecen como concepto separado.
+- "monthlyAnticipo": anticipos o adelantos descontados del neto. Solo si aparece explícitamente.
 - "annualGross" y "annualRetenciones": sólo si la nómina muestra totales acumulados anuales explícitamente.
 - Responde siempre usando la herramienta proporcionada, nunca con texto libre.`;
 

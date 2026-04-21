@@ -8,6 +8,7 @@ import { calculateRoute } from './routes/calculate.js';
 import { extractRoute } from './routes/extract.js';
 import { explainRoute } from './routes/explain.js';
 import { parseNominaRoute } from './routes/parse-nomina.js';
+import { parseRentaRoute } from './routes/parse-renta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Resolves to apps/web/dist from apps/api/src/
@@ -18,6 +19,7 @@ const app = Fastify({ logger: true });
 // CORS only needed when frontend is served separately (dev mode with Vite proxy)
 await app.register(cors, {
   origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  allowedHeaders: ['Content-Type', 'X-Api-Key'],
 });
 
 // API routes — registered before static so /api/* is never caught by the file server
@@ -25,6 +27,7 @@ await app.register(calculateRoute);
 await app.register(extractRoute);
 await app.register(explainRoute);
 await app.register(parseNominaRoute);
+await app.register(parseRentaRoute);
 
 // Serve the built React app
 try {

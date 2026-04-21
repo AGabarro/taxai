@@ -68,6 +68,27 @@ const PARSE_NOMINA_TOOL: Tool = {
         type: 'number',
         description: 'Total cuotas SS del trabajador si no aparecen desglosadas en los campos anteriores, en euros',
       },
+      monthlySalarioBase: {
+        type: 'number',
+        description: 'Salario base del período (el concepto "Salario Base" o "Sueldo Base"), en euros. No incluir complementos ni otros conceptos.',
+      },
+      monthlyRetribucionEspecie: {
+        type: 'number',
+        description:
+          'Retribución en especie incluida en el Total Devengado (seguro médico empresa, coche de empresa, tickets guardería, etc.), en euros. ' +
+          'Solo si aparece explícitamente como "Retribución en especie", "Retrib. Especie", "R. Especie" u otro concepto claramente identificable como especie.',
+      },
+      monthlyDietas: {
+        type: 'number',
+        description:
+          'Dietas y asignaciones para gastos de viaje/manutención del período, en euros. ' +
+          'Busca conceptos como "Dietas", "Plus transporte", "Plus distancia", "Gastos viaje", "Manutención". ' +
+          'Solo si aparece explícitamente.',
+      },
+      monthlyAnticipo: {
+        type: 'number',
+        description: 'Anticipo o adelanto de nómina descontado en este período, en euros. Busca "Anticipo", "Adelanto s/nómina".',
+      },
     },
     // All fields optional — only extract what's clearly present
   },

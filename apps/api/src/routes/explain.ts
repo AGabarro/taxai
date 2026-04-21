@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { explainResult } from '@taxai/ai-layer';
 import type { TaxResult } from '@taxai/shared';
 import { aiRateLimiter } from '../ratelimit.js';
+import { clientFromRequest } from '../anthropic.js';
 
 export async function explainRoute(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { result: TaxResult; question: string } }>(
@@ -25,9 +26,13 @@ export async function explainRoute(app: FastifyInstance): Promise<void> {
         return reply.status(429).send({ error: 'Demasiadas solicitudes. Inténtalo más tarde.' });
       }
       try {
-        const explanation = await explainResult(request.body.result, request.body.question);
+        const client = clientFromRequest(request);
+        const explanation = await explainResult(request.body.result, request.body.question, client);
         return reply.send({ explanation });
       } catch (err) {
+        if ((err as { status?: number }).status === 401) {
+          return reply.status(401).send({ error: 'Clave API no válida. Verifica tu clave en console.anthropic.com' });
+        }
         app.log.error(err);
         return reply.status(500).send({ error: 'Error interno del servidor' });
       }

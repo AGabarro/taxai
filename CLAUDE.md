@@ -106,23 +106,24 @@ taxai/
 │   │   │       ├── calculate.ts     ← POST /api/calculate
 │   │   │       ├── extract.ts       ← POST /api/extract  (rate-limited)
 │   │   │       ├── explain.ts       ← POST /api/explain  (rate-limited)
-│   │   │       └── parse-nomina.ts  ← POST /api/parse-nomina (multipart/form-data, rate-limited)
+│   │   │       ├── parse-nomina.ts  ← POST /api/parse-nomina (single PDF, monthly analysis, rate-limited)
+│   │   │       └── parse-renta.ts   ← POST /api/parse-renta  (up to 12 PDFs, full annual Renta, rate-limited)
 │   │   └── tests/
 │   │       └── parse-nomina.test.ts
 │   └── web/                         ← React 19 SPA, served as static by the API in production
 │       ├── src/
-│       │   ├── App.tsx              ← three-tab layout: form / chat / nómina
+│       │   ├── App.tsx              ← three-tab layout: form / nómina mensual / renta anual
 │       │   ├── main.tsx
 │       │   ├── components/
 │       │   │   ├── InputForm.tsx         ← field-by-field form, all TaxInput fields
-│       │   │   ├── ChatInput.tsx         ← free-text → extract → confirm → calculate
-│       │   │   ├── NominaUpload.tsx      ← PDF upload, extracted data, IRPF comparison card
+│       │   │   ├── NominaUpload.tsx      ← single PDF upload, monthly IRPF comparison card
+│       │   │   ├── RentaAnual.tsx        ← up to 12 PDFs, aggregated annual Renta calculation
 │       │   │   ├── ResultDashboard.tsx   ← hero card (a ingresar/devolver) + breakdown grid
 │       │   │   ├── WaterfallChart.tsx    ← Recharts bar chart per WaterfallStep
 │       │   │   ├── TaxBreakdownCharts.tsx ← KPI cards, donut (net vs tax), bar (state vs regional)
 │       │   │   └── ExplanationPanel.tsx  ← Q&A text area → calls /api/explain
 │       │   ├── api/
-│       │   │   └── taxai.ts         ← typed fetch wrappers (calculate, extract, explain, parseNomina)
+│       │   │   └── taxai.ts         ← typed fetch wrappers (calculate, explain, parseNomina, parseRenta)
 │       │   └── mocks/
 │       │       └── taxResult.ts     ← hardcoded MOCK_RESULT for local dev
 │       └── tests/
@@ -224,6 +225,7 @@ export interface NominaData {
   numberOfPayments?: number;      // typically 12 or 14
   monthlyGross?: number;
   annualGross?: number;
+  monthlyBaseIRPF?: number;       // IRPF taxable base (may differ from monthlyGross)
   monthlyRetenciones?: number;
   annualRetenciones?: number;
   retentionPercentage?: number;
@@ -236,7 +238,7 @@ export interface NominaData {
 
 export interface NominaComparison {
   calculatedTax: number;           // engine cuotaLiquidaTOTAL
-  retencionesFromNomina: number;   // annualised from the nómina
+  retencionesFromNomina: number;   // from the nómina (monthly or annual depending on context)
   difference: number;              // retencionesFromNomina - calculatedTax
   diffType: 'overpaid' | 'underpaid' | 'correct';  // correct = within 2%
   percentageDiff: number;
@@ -246,7 +248,19 @@ export interface NominaParseResult {
   nomina: NominaData;
   taxInput: Partial<TaxInput>;
   annualGross: number;
+  annualBaseIRPF: number;
   annualRetencionesNomina: number;
+  taxResult?: TaxResult;          // present if enough data available
+  comparison?: NominaComparison;  // present when taxResult is present
+}
+
+export interface RentaAnualResult {
+  months: NominaData[];           // one entry per uploaded PDF
+  annualGross: number;            // sum of all monthly devengados
+  annualBaseIRPF: number;         // sum of all monthly IRPF bases
+  annualRetencionesNomina: number; // sum of all monthly retenciones
+  annualSS: number;               // sum of all monthly SS contributions
+  taxInput: Partial<TaxInput>;
   taxResult?: TaxResult;          // present if enough data available
   comparison?: NominaComparison;  // present when taxResult is present
 }
@@ -260,12 +274,6 @@ POST /api/calculate
   Returns: TaxResult
   Errors:  400 (validation), 501 (foral region), 422 (missing rules), 500
 
-POST /api/extract
-  Body:    { message: string }   ← raw chat text, max 2000 chars, NO PII
-  Returns: Partial<TaxInput>     ← only fields the user mentioned
-  Errors:  400 (PII detected), 429 (rate limit), 500
-  Limit:   20 req/min per IP
-
 POST /api/explain
   Body:    { result: TaxResult, question: string }
   Returns: { explanation: string }  ← Spanish prose, no new numbers
@@ -274,15 +282,28 @@ POST /api/explain
 
 POST /api/parse-nomina
   Body:    multipart/form-data
-           - pdf: <file>          max 10 MB
+           - pdf: <file>          max 10 MB, single monthly payslip
            - region?: string      default "madrid"
-           - age?: number         default 30
+           - age?: number         default 35
            - civilStatus?: string default "single"
            - fiscalYear?: number  default 2025
-  Returns: NominaParseResult
+  Returns: NominaParseResult      (comparison uses monthly figures in UI)
   Errors:  400 (no file / bad PDF), 501 (foral), 429 (rate limit), 500
   Limit:   20 req/min per IP (shared aiRateLimiter)
+
+POST /api/parse-renta
+  Body:    multipart/form-data
+           - pdf_0, pdf_1, … pdf_N: up to 12 PDF files (annual payslips)
+           - region?: string      default "madrid"
+           - age?: number         default 35
+           - civilStatus?: string default "single"
+           - fiscalYear?: number  default 2025
+  Returns: RentaAnualResult       (sums actual monthly figures, no projection)
+  Errors:  400 (no files / bad PDF), 501 (foral), 429 (rate limit), 500
+  Limit:   20 req/min per IP (shared aiRateLimiter)
 ```
+
+> **Note:** The `/api/extract` endpoint (chat → structured TaxInput) still exists in the codebase but is no longer exposed in the UI. It can be removed in a future cleanup pass.
 
 ---
 
@@ -450,11 +471,13 @@ Up to €340 subtracted from cuota líquida after minimum deduction, split 50/50
 - [x] InputForm with all TaxInput fields
 
 ### Phase 2 — AI Integration ✅ COMPLETE
-- [x] `extractor.ts` + `/extract` endpoint with PII guard
+- [x] `extractor.ts` + `/extract` endpoint with PII guard (endpoint exists; chat UI removed)
 - [x] `explainer.ts` + `/explain` endpoint
-- [x] ChatInput + ExplanationPanel in the frontend
-- [x] `nomina-parser.ts` + `/parse-nomina` endpoint (bonus: PDF nómina upload and IRPF comparison)
-- [x] NominaUpload component with comparison card
+- [x] ExplanationPanel in the frontend (Q&A on tax result)
+- [x] `nomina-parser.ts` + `/parse-nomina` endpoint — single monthly payslip, monthly IRPF comparison
+- [x] NominaUpload component — uploads one PDF, shows monthly retention vs. calculated
+- [x] `parse-renta.ts` + `/parse-renta` endpoint — up to 12 PDFs, full annual Renta calculation
+- [x] RentaAnual component — multi-PDF upload, monthly breakdown table, annual result card
 - [x] TaxBreakdownCharts (donut + grouped bar charts)
 
 ### Phase 3 — Full Regional Coverage ✅ MOSTLY COMPLETE

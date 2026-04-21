@@ -52,6 +52,10 @@ interface InputFormProps {
   onResult: (result: TaxResult) => void
 }
 
+const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5'
+const inputCls =
+  'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors'
+
 export function InputForm({ onResult }: InputFormProps) {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [loading, setLoading] = useState(false)
@@ -89,193 +93,140 @@ export function InputForm({ onResult }: InputFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Comunidad Autónoma */}
-        <div className="md:col-span-2">
-          <label htmlFor="region" className="block text-sm font-medium text-gray-700 mb-1">
-            Comunidad Autónoma
-          </label>
-          <select
-            id="region"
-            name="region"
-            value={form.region}
-            onChange={handleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {REGIONS.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
-        </div>
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
 
-        {/* Ejercicio fiscal */}
-        <div>
-          <label htmlFor="fiscalYear" className="block text-sm font-medium text-gray-700 mb-1">
-            Ejercicio fiscal
-          </label>
-          <input
-            id="fiscalYear"
-            name="fiscalYear"
-            type="number"
-            value={form.fiscalYear}
-            onChange={handleChange}
-            min={2020}
-            max={2030}
-            required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+      {/* ── Section 1: Situación personal ──────────────────────────────── */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+          Situación personal
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label htmlFor="region" className={labelCls}>Comunidad autónoma</label>
+            <select id="region" name="region" value={form.region} onChange={handleChange} className={inputCls}>
+              {REGIONS.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
 
-        {/* Edad */}
-        <div>
-          <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">
-            Edad
-          </label>
-          <input
-            id="age"
-            name="age"
-            type="number"
-            value={form.age}
-            onChange={handleChange}
-            min={16}
-            max={120}
-            required
-            placeholder="Ej: 35"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+          <div>
+            <label htmlFor="fiscalYear" className={labelCls}>Ejercicio fiscal</label>
+            <select id="fiscalYear" name="fiscalYear" value={form.fiscalYear} onChange={handleChange} className={inputCls}>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
 
-        {/* Salario bruto */}
-        <div>
-          <label htmlFor="grossSalary" className="block text-sm font-medium text-gray-700 mb-1">
-            Salario bruto anual (€)
-          </label>
-          <input
-            id="grossSalary"
-            name="grossSalary"
-            type="number"
-            value={form.grossSalary}
-            onChange={handleChange}
-            min={0}
-            step={100}
-            required
-            placeholder="Ej: 35000"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+          <div>
+            <label htmlFor="age" className={labelCls}>Edad</label>
+            <input
+              id="age" name="age" type="number"
+              value={form.age} onChange={handleChange}
+              min={16} max={120} required placeholder="Ej: 35"
+              className={inputCls}
+            />
+          </div>
 
-        {/* Otros ingresos */}
-        <div>
-          <label htmlFor="otherIncome" className="block text-sm font-medium text-gray-700 mb-1">
-            Otros ingresos (€) <span className="text-gray-400 font-normal">— opcional</span>
-          </label>
-          <input
-            id="otherIncome"
-            name="otherIncome"
-            type="number"
-            value={form.otherIncome}
-            onChange={handleChange}
-            min={0}
-            step={100}
-            placeholder="0"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+          <div>
+            <label htmlFor="civilStatus" className={labelCls}>Estado civil</label>
+            <select id="civilStatus" name="civilStatus" value={form.civilStatus} onChange={handleChange} className={inputCls}>
+              <option value="single">Soltero/a</option>
+              <option value="married">Casado/a</option>
+              <option value="widowed">Viudo/a</option>
+              <option value="separated">Separado/a</option>
+            </select>
+          </div>
 
-        {/* Retenciones */}
-        <div>
-          <label htmlFor="retenciones" className="block text-sm font-medium text-gray-700 mb-1">
-            Retenciones a cuenta (€)
-          </label>
-          <input
-            id="retenciones"
-            name="retenciones"
-            type="number"
-            value={form.retenciones}
-            onChange={handleChange}
-            min={0}
-            step={100}
-            required
-            placeholder="Ej: 5000"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          <div>
+            <label htmlFor="disability" className={labelCls}>Discapacidad reconocida</label>
+            <select id="disability" name="disability" value={form.disability} onChange={handleChange} className={inputCls}>
+              <option value="">Ninguna</option>
+              <option value="33">33% o más</option>
+              <option value="65">65% o más</option>
+            </select>
+          </div>
         </div>
+      </div>
 
-        {/* Estado civil */}
-        <div>
-          <label htmlFor="civilStatus" className="block text-sm font-medium text-gray-700 mb-1">
-            Estado civil
-          </label>
-          <select
-            id="civilStatus"
-            name="civilStatus"
-            value={form.civilStatus}
-            onChange={handleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="single">Soltero/a</option>
-            <option value="married">Casado/a</option>
-            <option value="widowed">Viudo/a</option>
-            <option value="separated">Separado/a</option>
-          </select>
+      <div className="border-t border-gray-100" />
+
+      {/* ── Section 2: Ingresos y retenciones ───────────────────────────── */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+          Ingresos y retenciones
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label htmlFor="grossSalary" className={labelCls}>Salario bruto anual (€)</label>
+            <input
+              id="grossSalary" name="grossSalary" type="number"
+              value={form.grossSalary} onChange={handleChange}
+              min={0} step={100} required placeholder="Ej: 35 000"
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="retenciones" className={labelCls}>Retenciones a cuenta (€)</label>
+            <input
+              id="retenciones" name="retenciones" type="number"
+              value={form.retenciones} onChange={handleChange}
+              min={0} step={100} required placeholder="Ej: 5 000"
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="otherIncome" className={labelCls}>
+              Otros ingresos (€) <span className="text-gray-300 normal-case font-normal">opcional</span>
+            </label>
+            <input
+              id="otherIncome" name="otherIncome" type="number"
+              value={form.otherIncome} onChange={handleChange}
+              min={0} step={100} placeholder="0"
+              className={inputCls}
+            />
+          </div>
         </div>
+      </div>
 
-        {/* Dependientes menores de 25 */}
-        <div>
-          <label htmlFor="dependentsUnder25" className="block text-sm font-medium text-gray-700 mb-1">
-            Hijos/dependientes menores de 25
-          </label>
-          <input
-            id="dependentsUnder25"
-            name="dependentsUnder25"
-            type="number"
-            value={form.dependentsUnder25}
-            onChange={handleChange}
-            min={0}
-            required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+      <div className="border-t border-gray-100" />
 
-        {/* Dependientes mayores de 65 */}
-        <div>
-          <label htmlFor="dependentsOver65" className="block text-sm font-medium text-gray-700 mb-1">
-            Dependientes mayores de 65
-          </label>
-          <input
-            id="dependentsOver65"
-            name="dependentsOver65"
-            type="number"
-            value={form.dependentsOver65}
-            onChange={handleChange}
-            min={0}
-            required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+      {/* ── Section 3: Familia ──────────────────────────────────────────── */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+          Familia a cargo
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="dependentsUnder25" className={labelCls}>
+              Hijos / dependientes &lt; 25 años
+            </label>
+            <input
+              id="dependentsUnder25" name="dependentsUnder25" type="number"
+              value={form.dependentsUnder25} onChange={handleChange}
+              min={0} required
+              className={inputCls}
+            />
+          </div>
 
-        {/* Discapacidad */}
-        <div>
-          <label htmlFor="disability" className="block text-sm font-medium text-gray-700 mb-1">
-            Grado de discapacidad
-          </label>
-          <select
-            id="disability"
-            name="disability"
-            value={form.disability}
-            onChange={handleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Ninguna</option>
-            <option value="33">33%</option>
-            <option value="65">65%+</option>
-          </select>
+          <div>
+            <label htmlFor="dependentsOver65" className={labelCls}>
+              Ascendientes &gt; 65 años a cargo
+            </label>
+            <input
+              id="dependentsOver65" name="dependentsOver65" type="number"
+              value={form.dependentsOver65} onChange={handleChange}
+              min={0} required
+              className={inputCls}
+            />
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700" role="alert">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </div>
       )}
@@ -283,11 +234,11 @@ export function InputForm({ onResult }: InputFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-blue-600 text-white font-semibold py-3 px-4 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 px-4 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
-            <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             Calculando…
           </span>
         ) : (

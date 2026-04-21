@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart';
 import pdfParse from 'pdf-parse';
 import { parseNomina } from '@taxai/ai-layer';
 import { calculate } from '@taxai/engine';
+import { clientFromRequest } from '../anthropic.js';
 import type {
   TaxInput,
   SpanishRegion,
@@ -20,7 +21,7 @@ export const VALID_REGIONS: SpanishRegion[] = [
   'la-rioja', 'madrid', 'murcia', 'navarra', 'pais-vasco', 'valenciana',
 ];
 
-const VALID_CIVIL_STATUS: CivilStatus[] = ['single', 'married', 'widowed', 'separated'];
+export const VALID_CIVIL_STATUS: CivilStatus[] = ['single', 'married', 'widowed', 'separated'];
 
 const CORRECT_THRESHOLD_PCT = 2; // within 2% → considered correct
 
@@ -233,8 +234,12 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
       // Use Claude to extract nomina data
       let nomina: NominaData;
       try {
-        nomina = await parseNomina(pdfText);
+        const client = clientFromRequest(request);
+        nomina = await parseNomina(pdfText, client);
       } catch (err) {
+        if ((err as { status?: number }).status === 401) {
+          return reply.status(401).send({ error: 'Clave API no válida. Verifica tu clave en console.anthropic.com' });
+        }
         app.log.error(err);
         return reply.status(500).send({ error: 'Error al analizar la nómina con IA. Inténtalo de nuevo.' });
       }

@@ -116,6 +116,24 @@ export interface NominaData {
   monthlySS_vocational?: number;
   /** Total employee SS (sum of above four, or directly stated), in euros */
   monthlySSEmployee?: number;
+
+  // ── Salary breakdown ──────────────────────────────────────────────────────
+  /** Salario base (base salary before supplements), in euros */
+  monthlySalarioBase?: number;
+  /**
+   * Retribución en especie included in Total Devengado (company car, health insurance, etc.).
+   * These are declared benefits — included in monthlyGross but may be partially exempt from IRPF,
+   * which explains the gap between Total Devengado and Base I.R.P.F.
+   */
+  monthlyRetribucionEspecie?: number;
+  /**
+   * Dietas y asignaciones para gastos de viaje (meal/travel allowances).
+   * Exempt from IRPF up to legal limits (€26.67/day inland, €48.08/day abroad for 2025).
+   * Their presence reduces Base I.R.P.F. below Total Devengado.
+   */
+  monthlyDietas?: number;
+  /** Anticipos a cuenta del salario (advances deducted from net pay), in euros */
+  monthlyAnticipo?: number;
 }
 
 /** Comparison between employer-withheld IRPF and the engine-calculated tax. */
@@ -155,5 +173,25 @@ export interface NominaParseResult {
   /** Full tax calculation result (present if enough data was available) */
   taxResult?: TaxResult;
   /** Side-by-side comparison (present when taxResult is present) */
+  comparison?: NominaComparison;
+}
+
+/** Full result returned by POST /api/parse-renta */
+export interface RentaAnualResult {
+  /** Financial data extracted per uploaded payslip (one entry per PDF) */
+  months: NominaData[];
+  /** Sum of all monthly Total Devengado figures */
+  annualGross: number;
+  /** Sum of all monthly Base I.R.P.F. figures used as grossSalary for the engine */
+  annualBaseIRPF: number;
+  /** Sum of all monthly IRPF retenciones */
+  annualRetencionesNomina: number;
+  /** Sum of all monthly employee SS contributions */
+  annualSS: number;
+  /** TaxInput fields derived from aggregated annual data */
+  taxInput: Partial<TaxInput>;
+  /** Full engine result (present when enough data was available) */
+  taxResult?: TaxResult;
+  /** Comparison of total retenciones vs. calculated annual tax */
   comparison?: NominaComparison;
 }

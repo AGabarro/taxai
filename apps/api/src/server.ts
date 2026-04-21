@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { calculateRoute } from './routes/calculate.js';
 import { extractRoute } from './routes/extract.js';
 import { explainRoute } from './routes/explain.js';
+import { parseNominaRoute } from './routes/parse-nomina.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Resolves to apps/web/dist from apps/api/src/
@@ -23,6 +24,7 @@ await app.register(cors, {
 await app.register(calculateRoute);
 await app.register(extractRoute);
 await app.register(explainRoute);
+await app.register(parseNominaRoute);
 
 // Serve the built React app
 try {

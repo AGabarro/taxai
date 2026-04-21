@@ -6,8 +6,9 @@ import { TaxBreakdownCharts } from './components/TaxBreakdownCharts'
 import { InputForm } from './components/InputForm'
 import { ChatInput } from './components/ChatInput'
 import { ExplanationPanel } from './components/ExplanationPanel'
+import { NominaUpload } from './components/NominaUpload'
 
-type InputTab = 'form' | 'chat'
+type InputTab = 'form' | 'chat' | 'nomina'
 
 export default function App() {
   const [result, setResult] = useState<TaxResult | null>(null)
@@ -54,13 +55,22 @@ export default function App() {
             >
               Chat
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('nomina')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none ${
+                activeTab === 'nomina'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Subir nómina
+            </button>
           </div>
 
-          {activeTab === 'form' ? (
-            <InputForm onResult={setResult} />
-          ) : (
-            <ChatInput onResult={setResult} />
-          )}
+          {activeTab === 'form' && <InputForm onResult={setResult} />}
+          {activeTab === 'chat' && <ChatInput onResult={setResult} />}
+          {activeTab === 'nomina' && <NominaUpload onResult={setResult} />}
         </section>
 
         {/* Results section */}

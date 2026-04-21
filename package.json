@@ -1,0 +1,9 @@
+{
+  "name": "taxai",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "test": "pnpm -r test",
+    "dev:api": "pnpm --filter @taxai/api dev"
+  }
+}

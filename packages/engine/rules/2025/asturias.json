@@ -1,0 +1,24 @@
+{
+  "region": "asturias",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 12450,  "rate": 0.10  },
+    { "from": 12450,   "to": 17700,  "rate": 0.12  },
+    { "from": 17700,   "to": 33007,  "rate": 0.14  },
+    { "from": 33007,   "to": 53407,  "rate": 0.185 },
+    { "from": 53407,   "to": 70000,  "rate": 0.215 },
+    { "from": 70000,   "to": 90000,  "rate": 0.225 },
+    { "from": 90000,   "to": 175000, "rate": 0.25  },
+    { "from": 175000,  "to": null,   "rate": 0.255 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

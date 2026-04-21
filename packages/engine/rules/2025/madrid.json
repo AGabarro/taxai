@@ -1,0 +1,21 @@
+{
+  "region": "madrid",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 13362,  "rate": 0.085 },
+    { "from": 13362,  "to": 18004,  "rate": 0.107 },
+    { "from": 18004,  "to": 35425,  "rate": 0.128 },
+    { "from": 35425,  "to": 57320,  "rate": 0.174 },
+    { "from": 57320,  "to": null,   "rate": 0.205 }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

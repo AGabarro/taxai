@@ -1,0 +1,25 @@
+{
+  "region": "extremadura",
+  "fiscalYear": 2025,
+  "autonomicBrackets": [
+    { "from": 0,       "to": 12450,  "rate": 0.08  },
+    { "from": 12450,   "to": 20200,  "rate": 0.10  },
+    { "from": 20200,   "to": 24200,  "rate": 0.16  },
+    { "from": 24200,   "to": 35200,  "rate": 0.175 },
+    { "from": 35200,   "to": 60000,  "rate": 0.21  },
+    { "from": 60000,   "to": 80200,  "rate": 0.235 },
+    { "from": 80200,   "to": 99200,  "rate": 0.24  },
+    { "from": 99200,   "to": 120200, "rate": 0.245 },
+    { "from": 120200,  "to": null,   "rate": 0.25  }
+  ],
+  "trabajoReductions": {
+    "gastoFlatDeduction": 2000,
+    "fullReductionThreshold": 14852,
+    "maxReduction": 7302,
+    "phaseOutSegment1End": 17673.52,
+    "phaseOutRate1": 1.75,
+    "phaseOutSegment2End": 19747.50,
+    "phaseOutRate2": 1.14,
+    "segment2BaseReduction": 2364.34
+  }
+}

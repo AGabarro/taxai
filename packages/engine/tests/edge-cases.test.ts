@@ -3,7 +3,7 @@ import { calculate } from '../src/calculator.js';
 import type { TaxInput } from '@taxai/shared';
 
 const BASE: TaxInput = {
-  fiscalYear: 2024,
+  fiscalYear: 2025,
   region: 'madrid',
   age: 35,
   grossSalary: 0,
@@ -30,13 +30,13 @@ describe('Edge cases', () => {
 
   it('disability grade 33 — included in result without crashing', () => {
     const r = calculate({ ...BASE, grossSalary: 30000, disability: 33 });
-    expect(r.fiscalYear).toBe(2024);
+    expect(r.fiscalYear).toBe(2025);
     expect(r.cuotaLiquidaTOTAL).toBeGreaterThanOrEqual(0);
   });
 
   it('disability grade 65 — included in result without crashing', () => {
     const r = calculate({ ...BASE, grossSalary: 30000, disability: 65 });
-    expect(r.fiscalYear).toBe(2024);
+    expect(r.fiscalYear).toBe(2025);
   });
 
   it('multiple dependents (4 children + 2 elderly) — minimum is correct', () => {
@@ -46,11 +46,11 @@ describe('Edge cases', () => {
       dependentsUnder25: 4,
       dependentsOver65: 2,
     });
-    // 4 children: 2400 + 2700 + 4000 + 4000 = 13100
-    // 2 elderly: 1125 * 2 = 2250
+    // 4 children: 2400 + 2700 + 4000 + 4500 = 13600 (4th child = €4,500 in 2025)
+    // 2 elderly: 1150 * 2 = 2300
     // personal base: 5550
-    // total: 5550 + 13100 + 2250 = 20900
-    expect(r.minimumPersonalFamiliar).toBe(20900);
+    // total: 5550 + 13600 + 2300 = 21450
+    expect(r.minimumPersonalFamiliar).toBe(21450);
   });
 
   it('age 75+ — maximum personal minimum', () => {

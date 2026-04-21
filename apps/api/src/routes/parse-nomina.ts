@@ -61,12 +61,29 @@ export function annualise(monthly: number, numberOfPayments = 12): number {
   return Math.round(monthly * numberOfPayments * 100) / 100;
 }
 
-/** Derive the best estimate for annual gross from extracted nomina data. */
+/** Derive the best estimate for annual gross (Total Devengado) — used for display. */
 export function deriveAnnualGross(nomina: NominaData): number {
   if (nomina.annualGross && nomina.annualGross > 0) return nomina.annualGross;
   if (nomina.monthlyGross && nomina.monthlyGross > 0)
     return annualise(nomina.monthlyGross, nomina.numberOfPayments ?? 12);
   return 0;
+}
+
+/**
+ * Derive the annual Base I.R.P.F. used as grossSalary for the engine.
+ *
+ * Prefers monthlyBaseIRPF when present — this excludes tax-exempt benefits
+ * (meal vouchers, health insurance) that are in Total Devengado but must not
+ * be subject to IRPF withholding.  Falls back to Total Devengado when no
+ * explicit IRPF base was found on the payslip.
+ *
+ * Exported so it can be unit-tested independently.
+ */
+export function deriveAnnualBaseIRPF(nomina: NominaData): number {
+  if (nomina.monthlyBaseIRPF && nomina.monthlyBaseIRPF > 0)
+    return annualise(nomina.monthlyBaseIRPF, nomina.numberOfPayments ?? 12);
+  // No dedicated IRPF base — fall back to Total Devengado
+  return deriveAnnualGross(nomina);
 }
 
 /** Derive the best estimate for annual retenciones from extracted nomina data. */
@@ -229,8 +246,14 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
       }
 
       const annualGross = deriveAnnualGross(nomina);
+      const annualBaseIRPF = deriveAnnualBaseIRPF(nomina);
       const annualRetencionesNomina = deriveAnnualRetenciones(nomina);
       const annualSS = deriveAnnualSS(nomina);
+
+      // The engine always works on the IRPF base (excluding tax-exempt benefits).
+      // When no explicit Base I.R.P.F. was found on the payslip, annualBaseIRPF
+      // falls back to annualGross so existing behaviour is unchanged.
+      const engineGross = annualBaseIRPF;
 
       // Override fiscalYear from nomina if detected
       if (nomina.fiscalYear) fiscalYear = nomina.fiscalYear;
@@ -241,7 +264,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
         region,
         age,
         civilStatus,
-        grossSalary: annualGross > 0 ? annualGross : undefined,
+        grossSalary: engineGross > 0 ? engineGross : undefined,
         ssContributions: annualSS > 0 ? annualSS : undefined,
         retenciones: annualRetencionesNomina > 0 ? annualRetencionesNomina : undefined,
         dependentsUnder25: 0,
@@ -252,12 +275,13 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
         nomina,
         taxInput,
         annualGross,
+        annualBaseIRPF,
         annualRetencionesNomina,
       };
 
       // Run engine if we have enough data
       const canCalculate =
-        annualGross > 0 &&
+        engineGross > 0 &&
         !FORAL_REGIONS.includes(region as typeof FORAL_REGIONS[number]);
 
       if (canCalculate) {
@@ -267,7 +291,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
             region,
             age,
             civilStatus,
-            grossSalary: annualGross,
+            grossSalary: engineGross,
             ssContributions: annualSS > 0 ? annualSS : undefined,
             retenciones: annualRetencionesNomina,
             dependentsUnder25: 0,

@@ -19,7 +19,8 @@ Reglas estrictas:
   * Si en la sección de DEVENGOS aparece un concepto como "P.P. Extras", "Paga Extra Prorr", "Prorrateo pagas", "P.P. Paga Verano", "P.P. Paga Navidad" o cualquier variante de "prorrateo" → pon 12. Esto significa que las pagas extras ya están repartidas dentro del salario mensual; multiplicar por 14 sobreestimaría el ingreso anual.
   * Si la nómina es ELLA MISMA una paga extra (el período indica "Paga de Verano", "Paga de Navidad", "Paga Extra" como período completo, no como un concepto dentro de devengos) → pon 14 y extrae ese importe como paga adicional.
   * Si no hay ninguna indicación clara → omite el campo (se asumirá 12 por defecto).
-- "monthlyGross": Total Devengado del período (suma de todos los conceptos salariales devengados).
+- "monthlyGross": Total Devengado del período (suma de todos los conceptos salariales devengados, incluidas retribuciones exentas).
+- "monthlyBaseIRPF": Base I.R.P.F. del período — la base sobre la que el empleador calcula la retención IRPF. Aparece en la sección de bases como "Base I.R.P.F.", "Base Retención" o similar. Puede ser inferior al Total Devengado cuando hay retribuciones exentas (ticket restaurante, seguro médico de empresa, etc.). Extrae este campo SÓLO si aparece explícitamente; no lo calcules ni lo estimes.
 - "monthlyRetenciones": importe de la retención IRPF de este período. Busca el concepto etiquetado como "Tributación I.R.P.F.", "Retención IRPF", "IRPF" o concepto 999. Usa el importe en euros, no el porcentaje.
 - "retentionPercentage": tipo de retención IRPF aplicado (ej. 15.5 para 15,5%).
 - "monthlySS_CC": Contingencias Comunes del trabajador (cuota del empleado, no del empleador).

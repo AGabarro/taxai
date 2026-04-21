@@ -89,6 +89,13 @@ export interface NominaData {
   monthlyGross?: number;
   /** Annual gross stated explicitly in the nómina (some show acumulado), in euros */
   annualGross?: number;
+  /**
+   * Base I.R.P.F. for this pay period — the taxable base on which IRPF withholding is calculated.
+   * May be lower than monthlyGross when tax-exempt benefits (meal vouchers, health insurance, etc.)
+   * are included in Total Devengado but excluded from the IRPF base.
+   * This is the figure the employer uses to compute the withholding amount.
+   */
+  monthlyBaseIRPF?: number;
   /** IRPF withholding amount deducted this pay period (Concept 999 / Tributación IRPF), in euros */
   monthlyRetenciones?: number;
   /** IRPF withheld year-to-date / annual (if stated in nómina), in euros */
@@ -134,8 +141,15 @@ export interface NominaParseResult {
   nomina: NominaData;
   /** TaxInput fields that could be mapped from the nómina + any user overrides */
   taxInput: Partial<TaxInput>;
-  /** Best estimate of annual gross used for the calculation */
+  /** Annualised Total Devengado — shown as "Salario Bruto" in the UI */
   annualGross: number;
+  /**
+   * Annualised Base I.R.P.F. used as grossSalary for the engine.
+   * When monthlyBaseIRPF was extracted this is monthlyBaseIRPF × payments.
+   * When absent, the engine falls back to annualGross (Total Devengado).
+   * Use this value (not annualGross) to understand what base the tax was calculated on.
+   */
+  annualBaseIRPF: number;
   /** Best estimate of annualised retenciones from the nómina */
   annualRetencionesNomina: number;
   /** Full tax calculation result (present if enough data was available) */

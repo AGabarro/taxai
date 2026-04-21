@@ -15,6 +15,7 @@ import {
   annualise,
   detectProration,
   deriveAnnualGross,
+  deriveAnnualBaseIRPF,
   deriveAnnualRetenciones,
   deriveAnnualSS,
   buildComparison,
@@ -121,6 +122,48 @@ describe('deriveAnnualGross', () => {
   });
 });
 
+// ── deriveAnnualBaseIRPF ─────────────────────────────────────────────────────
+
+describe('deriveAnnualBaseIRPF', () => {
+  it('uses monthlyBaseIRPF × 12 when present', () => {
+    // Real scenario: 4373.80 IRPF base vs 4598.17 Total Devengado (224.37 exempt benefits)
+    const nomina: NominaData = { monthlyBaseIRPF: 4373.80, monthlyGross: 4598.17 };
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(52485.6); // 4373.80 × 12
+  });
+
+  it('uses monthlyBaseIRPF × 14 when numberOfPayments is 14', () => {
+    const nomina: NominaData = { monthlyBaseIRPF: 4373.80, monthlyGross: 4598.17, numberOfPayments: 14 };
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(61233.2); // 4373.80 × 14
+  });
+
+  it('falls back to annualGross (Total Devengado) when no IRPF base present', () => {
+    const nomina: NominaData = { monthlyGross: 4598.17 };
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(55178.04); // 4598.17 × 12 — same as deriveAnnualGross
+  });
+
+  it('prefers monthlyBaseIRPF over annualGross fallback', () => {
+    const nomina: NominaData = { monthlyBaseIRPF: 4373.80, annualGross: 60000 };
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(52485.6); // monthlyBaseIRPF wins
+  });
+
+  it('falls back to annualGross explicit field when no monthlyBaseIRPF', () => {
+    const nomina: NominaData = { annualGross: 60000 };
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(60000);
+  });
+
+  it('returns 0 when no data available', () => {
+    expect(deriveAnnualBaseIRPF({})).toBe(0);
+  });
+
+  it('IRPF base is lower than Total Devengado by the exempt benefit amount', () => {
+    const nomina: NominaData = { monthlyBaseIRPF: 4373.80, monthlyGross: 4598.17 };
+    const base = deriveAnnualBaseIRPF(nomina);
+    const gross = deriveAnnualGross(nomina);
+    // 224.37 × 12 = 2692.44 of annual exempt benefits excluded from IRPF
+    expect(Math.round((gross - base) * 100) / 100).toBe(2692.44);
+  });
+});
+
 // ── deriveAnnualRetenciones ──────────────────────────────────────────────────
 
 describe('deriveAnnualRetenciones', () => {
@@ -210,6 +253,21 @@ describe('prorated payslip annualisation', () => {
     expect(deriveAnnualGross(nomina)).toBe(55178.04);       // 4598.17 × 12
     expect(deriveAnnualRetenciones(nomina)).toBe(12465.36); // 1038.78 × 12
     expect(deriveAnnualSS(nomina)).toBe(3520.56);           // 293.38  × 12
+  });
+
+  it('uses Base I.R.P.F. (not Total Devengado) as the engine input when available', () => {
+    // Scenario: prorated payslip with tax-exempt meal vouchers reducing IRPF base
+    const nomina: NominaData = {
+      monthlyGross: 4598.17,         // Total Devengado (includes exempt benefits)
+      monthlyBaseIRPF: 4373.80,      // Base I.R.P.F. (excludes meal vouchers etc.)
+      monthlyRetenciones: 1038.78,
+      numberOfPayments: 12,          // proration already detected
+    };
+
+    expect(deriveAnnualGross(nomina)).toBe(55178.04);    // display value
+    expect(deriveAnnualBaseIRPF(nomina)).toBe(52485.6);  // engine input (4373.80 × 12)
+    // The engine uses the IRPF base, so the comparison will be accurate
+    expect(deriveAnnualRetenciones(nomina)).toBe(12465.36);
   });
 
   it('would over-estimate by 16.7% if 14 were used instead of 12', () => {

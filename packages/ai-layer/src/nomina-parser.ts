@@ -29,6 +29,13 @@ const PARSE_NOMINA_TOOL: Tool = {
         type: 'number',
         description: 'Salario bruto anual acumulado si aparece explícitamente en la nómina, en euros',
       },
+      monthlyBaseIRPF: {
+        type: 'number',
+        description:
+          'Base I.R.P.F. del período — base sujeta a retención IRPF, sin retribuciones exentas (ticket restaurante, seguro médico, etc.). ' +
+          'Suele aparecer en la sección "Bases de Cotización/Retención" con la etiqueta "Base I.R.P.F.", "Base Retención" o similar. ' +
+          'Puede ser inferior al Total Devengado. Solo extrae este campo si aparece explícitamente.',
+      },
       monthlyRetenciones: {
         type: 'number',
         description: 'Importe de retención IRPF este período (Concepto 999 / "Tributación I.R.P.F."), en euros',

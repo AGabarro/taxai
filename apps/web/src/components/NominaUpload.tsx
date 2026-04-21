@@ -190,14 +190,26 @@ export function NominaUpload({ onResult }: NominaUploadProps) {
                 )}
                 {nomina.monthlyGross !== undefined && (
                   <div>
-                    <dt className="text-gray-500">Bruto mensual</dt>
+                    <dt className="text-gray-500">Total Devengado / mes</dt>
                     <dd className="font-medium text-gray-900">{fmt(nomina.monthlyGross)}</dd>
+                  </div>
+                )}
+                {nomina.monthlyBaseIRPF !== undefined && nomina.monthlyBaseIRPF !== nomina.monthlyGross && (
+                  <div>
+                    <dt className="text-gray-500">Base I.R.P.F. / mes</dt>
+                    <dd className="font-medium text-gray-900">{fmt(nomina.monthlyBaseIRPF)}</dd>
                   </div>
                 )}
                 {parseResult.annualGross > 0 && (
                   <div>
-                    <dt className="text-gray-500">Bruto anual estimado</dt>
+                    <dt className="text-gray-500">Salario bruto anual</dt>
                     <dd className="font-medium text-gray-900">{fmt(parseResult.annualGross)}</dd>
+                  </div>
+                )}
+                {parseResult.annualBaseIRPF > 0 && parseResult.annualBaseIRPF !== parseResult.annualGross && (
+                  <div>
+                    <dt className="text-gray-500">Base I.R.P.F. anual</dt>
+                    <dd className="font-medium text-gray-900 text-blue-700">{fmt(parseResult.annualBaseIRPF)}</dd>
                   </div>
                 )}
                 {nomina.monthlyRetenciones !== undefined && (

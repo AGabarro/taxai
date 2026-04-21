@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
-import type { WaterfallStep } from '../types'
+import type { WaterfallStep } from '@taxai/shared'
 
 const EUR = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
 const PCT = new Intl.NumberFormat('es-ES', { style: 'percent', minimumFractionDigits: 1 })

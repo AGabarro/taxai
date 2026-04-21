@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TaxResult } from './types'
+import type { TaxResult } from '@taxai/shared'
 import { MOCK_RESULT } from './mocks/taxResult'
 import { ResultDashboard } from './components/ResultDashboard'
 import { WaterfallChart } from './components/WaterfallChart'

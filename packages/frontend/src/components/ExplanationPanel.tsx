@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TaxResult } from '../types'
+import type { TaxResult } from '@taxai/shared'
 import { taxai } from '../api/taxai'
 
 interface ExplanationPanelProps {

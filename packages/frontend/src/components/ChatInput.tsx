@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TaxInput, TaxResult, SpanishRegion } from '../types'
+import type { TaxInput, TaxResult, SpanishRegion } from '@taxai/shared'
 import { taxai } from '../api/taxai'
 
 const REGION_NAMES: Record<SpanishRegion, string> = {

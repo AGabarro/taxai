@@ -1,4 +1,4 @@
-import type { TaxResult, SpanishRegion } from '../types'
+import type { TaxResult, SpanishRegion } from '@taxai/shared'
 
 const REGION_NAMES: Record<SpanishRegion, string> = {
   'andalusia': 'Andalucía',

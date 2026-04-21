@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TaxInput, TaxResult, SpanishRegion, CivilStatus, DisabilityGrade } from '../types'
+import type { TaxInput, TaxResult, SpanishRegion, CivilStatus, DisabilityGrade } from '@taxai/shared'
 import { taxai } from '../api/taxai'
 
 const REGIONS: { value: SpanishRegion; label: string }[] = [

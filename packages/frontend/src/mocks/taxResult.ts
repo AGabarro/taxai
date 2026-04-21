@@ -1,4 +1,4 @@
-import type { TaxResult } from '../types'
+import type { TaxResult } from '@taxai/shared'
 
 export const MOCK_RESULT: TaxResult = {
   fiscalYear: 2024,

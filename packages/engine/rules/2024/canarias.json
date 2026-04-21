@@ -1,0 +1,20 @@
+{
+  "region": "canarias",
+  "fiscalYear": 2024,
+  "autonomicBrackets": [
+    { "from": 0,      "to": 13465,  "rate": 0.09  },
+    { "from": 13465,  "to": 19022,  "rate": 0.115 },
+    { "from": 19022,  "to": 35185,  "rate": 0.14  },
+    { "from": 35185,  "to": 56382,  "rate": 0.185 },
+    { "from": 56382,  "to": 91350,  "rate": 0.235 },
+    { "from": 91350,  "to": 121200, "rate": 0.25  },
+    { "from": 121200, "to": null,   "rate": 0.26  }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

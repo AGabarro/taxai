@@ -1,0 +1,25 @@
+{
+  "region": "navarra",
+  "fiscalYear": 2024,
+  "_note": "Navarra is a foral community with its own tax system. Results are approximate — the standard state+regional split does not apply.",
+  "autonomicBrackets": [
+    { "from": 0,       "to": 4458,   "rate": 0.13  },
+    { "from": 4458,    "to": 10030,  "rate": 0.22  },
+    { "from": 10030,   "to": 21175,  "rate": 0.25  },
+    { "from": 21175,   "to": 35663,  "rate": 0.28  },
+    { "from": 35663,   "to": 51266,  "rate": 0.365 },
+    { "from": 51266,   "to": 66869,  "rate": 0.415 },
+    { "from": 66869,   "to": 89159,  "rate": 0.44  },
+    { "from": 89159,   "to": 139310, "rate": 0.47  },
+    { "from": 139310,  "to": 195034, "rate": 0.49  },
+    { "from": 195034,  "to": 334344, "rate": 0.505 },
+    { "from": 334344,  "to": null,   "rate": 0.52  }
+  ],
+  "trabajoReductions": {
+    "fullReductionThreshold": 14852,
+    "maxReduction": 5565,
+    "baseReduction": 2000,
+    "phaseOutStart": 14852,
+    "phaseOutEnd": 19747
+  }
+}

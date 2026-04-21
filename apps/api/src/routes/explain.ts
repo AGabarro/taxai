@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { explainResult } from '@taxai/ai-layer';
 import type { TaxResult } from '@taxai/shared';
+import { aiRateLimiter } from '../ratelimit.js';
 
 export async function explainRoute(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { result: TaxResult; question: string } }>(
@@ -19,6 +20,10 @@ export async function explainRoute(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
+      const ip = request.ip;
+      if (!aiRateLimiter.isAllowed(ip)) {
+        return reply.status(429).send({ error: 'Demasiadas solicitudes. Inténtalo más tarde.' });
+      }
       try {
         const explanation = await explainResult(request.body.result, request.body.question);
         return reply.send({ explanation });

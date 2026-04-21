@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { extractTaxInput, PiiDetectedError } from '@taxai/ai-layer';
+import { aiRateLimiter } from '../ratelimit.js';
 
 export async function extractRoute(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { message: string } }>(
@@ -17,6 +18,10 @@ export async function extractRoute(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
+      const ip = request.ip;
+      if (!aiRateLimiter.isAllowed(ip)) {
+        return reply.status(429).send({ error: 'Demasiadas solicitudes. Inténtalo más tarde.' });
+      }
       try {
         const result = await extractTaxInput(request.body.message);
         return reply.send(result);

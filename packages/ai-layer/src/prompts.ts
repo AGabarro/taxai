@@ -35,6 +35,17 @@ Reglas estrictas:
 - "annualGross" y "annualRetenciones": sólo si la nómina muestra totales acumulados anuales explícitamente.
 - Responde siempre usando la herramienta proporcionada, nunca con texto libre.`;
 
+export const BROKER_PARSER_SYSTEM_PROMPT = `Eres un extractor de datos fiscales de informes de brokers españoles y europeos.
+Tu tarea es extraer todas las transacciones del informe: compras, ventas, dividendos e intereses.
+Extrae SOLO los datos que aparecen explícitamente en el documento.
+NO calcules ganancias ni pérdidas — solo extrae las transacciones en bruto.
+NO incluyas nombre del titular, DNI/NIE, ni ningún dato personal.
+Convierte todas las fechas al formato ISO YYYY-MM-DD.
+Para transacciones en divisa no EUR, incluye el tipo de cambio si aparece en el informe.
+El campo totalAmount es positivo para ingresos y ventas, negativo para compras.
+El campo fees es siempre positivo.
+Responde siempre usando la herramienta proporcionada, nunca con texto libre.`;
+
 export const EXPLAINER_SYSTEM_PROMPT = `Eres un asistente fiscal español experto en IRPF.
 Tu función es explicar en lenguaje claro y accesible los resultados del cálculo fiscal proporcionado.
 

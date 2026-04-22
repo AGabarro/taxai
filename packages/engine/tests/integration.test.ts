@@ -453,3 +453,203 @@ describe('ssContributions — Art. 19 gastos deducibles', () => {
     expect(r1.cuotaLiquidaTOTAL).toBe(r2.cuotaLiquidaTOTAL);
   });
 });
+
+// ─── BLOCK 5: Base imponible del ahorro — Art. 46 & 49 LIRPF ─────────────────
+
+describe('Base imponible del ahorro — capital gains, dividends, loss compensation', () => {
+  /**
+   * Common salary base for all savings tests:
+   *   grossSalary = €35,000, Madrid 2025, single, age 35, no SS
+   *   rnt = 35,000 − 2,000 = 33,000 > 19,747.50 → trabajoReduction = 0
+   *   rendimientoNetoReducido = 33,000
+   *   baseImponibleGeneral  = 33,000
+   *   cuotaIntegraEstatal   = 12,450×9.5% + 7,750×12% + 12,800×15% = 4,032.75
+   *   cuotaIntegraAutonomica (Madrid) = 13,362×8.5% + 4,642×10.7% + 14,996×12.8% = 3,551.95
+   *   stateMinQuota (5,550×9.5%) = 527.25  → cuotaLiquidaEstatal   = 3,505.50
+   *   madridMinQuota(5,550×8.5%) = 471.75  → cuotaLiquidaAutonomica = 3,080.20
+   *   No 2025 cuota deduction (35,000 > 18,276)
+   *   salary-only cuotaLiquidaTOTAL = 6,585.70
+   *
+   * Savings brackets (Art. 66 & 76 LIRPF — identical for state and regional halves):
+   *   0–6,000 € @ 9.5% each half → 19% combined
+   *   6,000–50,000 € @ 10.5% each half → 21% combined
+   */
+
+  const SALARY_BASE: Omit<TaxInput, 'retenciones' | 'savingsIncome'> = {
+    fiscalYear: 2025,
+    region: 'madrid',
+    grossSalary: 35_000,
+    age: 35,
+    civilStatus: 'single',
+    dependentsUnder25: 0,
+    dependentsOver65: 0,
+  };
+
+  it('no savings income → baseImponibleAhorro = 0 and savings cuota = 0', () => {
+    const r = calculate({ ...SALARY_BASE, retenciones: 0 });
+    expect(r.baseImponibleAhorro).toBe(0);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(0);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(0);
+    expect(r.cuotaLiquidaAhorroEstatal).toBe(0);
+    expect(r.cuotaLiquidaAhorroAutonomica).toBe(0);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70);
+  });
+
+  it('capital gains €2,000 (within first bracket) → 19% combined rate, €380 extra tax', () => {
+    /**
+     * baseImponibleAhorro = 2,000
+     * cuotaIntegraAhorroEstatal    = 2,000 × 9.5%  = 190.00
+     * cuotaIntegraAhorroAutonomica = 2,000 × 9.5%  = 190.00
+     * mínimo personal (5,550) is fully absorbed by general base — no overflow
+     * cuotaLiquidaAhorro = 380.00 total
+     * cuotaLiquidaTOTAL  = 6,585.70 + 380.00 = 6,965.70
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { capitalGains: 2_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(2_000);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(190);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(190);
+    expect(r.cuotaLiquidaAhorroEstatal).toBe(190);
+    expect(r.cuotaLiquidaAhorroAutonomica).toBe(190);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_965.70);
+  });
+
+  it('capital gains €2,000 with 19% broker withholding → result identical to salary-only', () => {
+    /**
+     * Proving the "neutral withholding" property: when the broker withholds exactly
+     * 19% on the gain and the gain is within the first €6,000 bracket (rate = 19%),
+     * adding the savings income + matching retenciones changes the final result by €0.
+     *
+     * salary-only:   retenciones = 5,000; result = 6,585.70 − 5,000 = 1,585.70 (ingresar)
+     * with savings:  retenciones = 5,380; result = 6,965.70 − 5,380 = 1,585.70 (ingresar)
+     */
+    const salaryOnly = calculate({ ...SALARY_BASE, retenciones: 5_000 });
+    const withSavings = calculate({
+      ...SALARY_BASE,
+      retenciones: 5_380,     // 5,000 salary + 380 broker (19% of 2,000)
+      savingsIncome: { capitalGains: 2_000 },
+    });
+
+    expect(salaryOnly.resultAmount).toBe(withSavings.resultAmount);
+    expect(salaryOnly.resultType).toBe(withSavings.resultType);
+  });
+
+  it('capital gains €8,000 crossing €6,000 bracket → 21% on excess, effective rate > 19%', () => {
+    /**
+     * baseImponibleAhorro = 8,000
+     * cuotaIntegraAhorroEstatal:
+     *   0–6,000 @ 9.5%  = 570
+     *   6,000–8,000 @ 10.5% = 210
+     *   total state = 780
+     * cuotaIntegraAhorroAutonomica = 780 (identical savings brackets)
+     * cuotaLiquidaAhorro total = 1,560
+     * Effective combined rate = 1,560 / 8,000 = 19.5%
+     *
+     * With a 19%-flat broker withholding (€1,520): net extra tax = 1,560 − 1,520 = €40 owed.
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { capitalGains: 8_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(8_000);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(780);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(780);
+    expect(r.cuotaLiquidaAhorroEstatal).toBe(780);
+    expect(r.cuotaLiquidaAhorroAutonomica).toBe(780);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70 + 1_560);
+
+    // Broker withholds at flat 19% → user owes extra €40 because rate on €2,000 is actually 21%
+    const withBrokerRetention = calculate({
+      ...SALARY_BASE,
+      retenciones: 5_000 + 1_520, // 5,000 salary + 1,520 broker (19% of 8,000)
+      savingsIncome: { capitalGains: 8_000 },
+    });
+    const salaryOnly = calculate({ ...SALARY_BASE, retenciones: 5_000 });
+    expect(withBrokerRetention.resultAmount - salaryOnly.resultAmount).toBeCloseTo(40, 1);
+  });
+
+  it('dividends €3,000 + interest €1,000 → combined savings base €4,000 @ 19%', () => {
+    /**
+     * capitalGains = 0 → no gain/loss, just passive income
+     * baseImponibleAhorro = 3,000 + 1,000 = 4,000
+     * cuotaIntegraAhorroEstatal = 4,000 × 9.5% = 380
+     * cuotaIntegraAhorroAutonomica = 380
+     * cuotaLiquidaAhorro = 760
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { dividends: 3_000, interest: 1_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(4_000);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(380);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(380);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70 + 760);
+  });
+
+  it('Art. 49 — capital loss offsets up to 25% of dividends+interest', () => {
+    /**
+     * capitalGains = −500 (loss), dividends = 2,000
+     * lossAbs = 500
+     * maxOffset = 25% × 2,000 = 500
+     * offset = min(500, 500) = 500   (loss fully absorbed within cap)
+     * baseImponibleAhorro = 2,000 − 500 = 1,500
+     * cuotaIntegraAhorroEstatal = 1,500 × 9.5% = 142.50
+     * cuotaIntegraAhorroAutonomica = 142.50
+     * cuotaLiquidaAhorro = 285
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { capitalGains: -500, dividends: 2_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(1_500);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(142.50);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(142.50);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70 + 285);
+  });
+
+  it('Art. 49 — loss exceeds 25% cap: only partial offset, excess carries forward', () => {
+    /**
+     * capitalGains = −3,000 (loss), dividends = 2,000
+     * lossAbs = 3,000
+     * maxOffset = 25% × 2,000 = 500   ← cap applies, only 500 absorbed
+     * offset = min(3,000, 500) = 500
+     * baseImponibleAhorro = 2,000 − 500 = 1,500
+     * (remaining loss €2,500 carries forward — engine does not track carry-forward)
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { capitalGains: -3_000, dividends: 2_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(1_500);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70 + 285);
+  });
+
+  it('Art. 49 — pure capital loss with no dividends/interest → savings base = 0', () => {
+    /**
+     * No dividends/interest to offset against → entire loss carries forward.
+     * baseImponibleAhorro = 0, no savings tax.
+     */
+    const r = calculate({
+      ...SALARY_BASE,
+      retenciones: 0,
+      savingsIncome: { capitalGains: -2_000 },
+    });
+
+    expect(r.baseImponibleAhorro).toBe(0);
+    expect(r.cuotaIntegraAhorroEstatal).toBe(0);
+    expect(r.cuotaIntegraAhorroAutonomica).toBe(0);
+    expect(r.cuotaLiquidaTOTAL).toBe(6_585.70);
+  });
+});

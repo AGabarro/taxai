@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import type { NominaParseResult, SpanishRegion, CivilStatus } from '@taxai/shared'
 import { taxai } from '../api/taxai'
+import { DownloadPDFButton } from './DownloadPDFButton'
+import { NominaMensualPDF } from '../pdf/NominaMensualPDF'
 
 interface NominaUploadProps {
   onResult: (result: import('@taxai/shared').TaxResult) => void
@@ -455,6 +457,16 @@ export function NominaUpload({ onResult: _onResult }: NominaUploadProps) {
       {/* ── Results ──────────────────────────────────────────────────────── */}
       {parseResult && (
         <div className="space-y-4">
+
+          {/* Download button — mirrors exactly what is shown on screen (monthly data) */}
+          {parseResult.taxResult && (
+            <div className="flex justify-end">
+              <DownloadPDFButton
+                pdfDocument={<NominaMensualPDF parseResult={parseResult} />}
+                filename={`taxai-nomina-${parseResult.nomina.period?.replace(/\s+/g, '-') ?? 'mensual'}.pdf`}
+              />
+            </div>
+          )}
 
           {/* PRIMARY HERO — monthly comparison */}
           {comp && monthlyCalculated !== undefined && (

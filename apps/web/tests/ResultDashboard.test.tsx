@@ -7,7 +7,8 @@ import type { TaxResult } from '@taxai/shared'
 describe('ResultDashboard', () => {
   it('shows "A devolver" badge and green styling for negative resultAmount', () => {
     render(<ResultDashboard result={MOCK_RESULT} />)
-    expect(screen.getByText('A devolver')).toBeTruthy()
+    // "A devolver" appears in both the hero badge and the breakdown row
+    expect(screen.getAllByText('A devolver').length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows "A ingresar" badge for positive resultAmount', () => {
@@ -17,22 +18,24 @@ describe('ResultDashboard', () => {
       resultType: 'a_ingresar',
     }
     render(<ResultDashboard result={payResult} />)
-    expect(screen.getByText('A ingresar')).toBeTruthy()
+    expect(screen.getAllByText('A ingresar').length).toBeGreaterThanOrEqual(1)
   })
 
   it('displays the fiscal year and region name in the subtext', () => {
     render(<ResultDashboard result={MOCK_RESULT} />)
-    expect(screen.getByText(/Declaración de la Renta 2024/)).toBeTruthy()
-    expect(screen.getByText(/Comunidad de Madrid/)).toBeTruthy()
+    // The hero subtext renders as "Renta {year} · {region}" across sibling text nodes
+    expect(screen.getByText(/Renta 2024/)).toBeTruthy()
+    expect(screen.getAllByText(/Comunidad de Madrid/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders all 6 breakdown rows', () => {
+  it('renders key breakdown rows', () => {
     render(<ResultDashboard result={MOCK_RESULT} />)
     expect(screen.getByText('Salario bruto')).toBeTruthy()
     expect(screen.getByText('Rendimiento neto reducido')).toBeTruthy()
     expect(screen.getByText('Mínimo personal y familiar')).toBeTruthy()
-    expect(screen.getByText('Cuota íntegra total')).toBeTruthy()
+    expect(screen.getByText('Cuota íntegra estatal')).toBeTruthy()
     expect(screen.getByText('Cuota líquida total')).toBeTruthy()
-    expect(screen.getByText('Retenciones a cuenta')).toBeTruthy()
+    // "Retenciones" appears in both the hero KPI and the breakdown row
+    expect(screen.getAllByText('Retenciones').length).toBeGreaterThanOrEqual(1)
   })
 })

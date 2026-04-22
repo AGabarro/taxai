@@ -1,10 +1,26 @@
 import { useRef, useState } from 'react'
 import type { RentaAnualResult, TaxResult, SpanishRegion, CivilStatus } from '@taxai/shared'
 import { taxai } from '../api/taxai'
+import { DownloadPDFButton } from './DownloadPDFButton'
+import { RentaAnualPDF } from '../pdf/RentaAnualPDF'
 
 interface RentaAnualProps {
   onResult: (result: TaxResult) => void
 }
+
+// ─── Investment entry (mirrors a row from the spreadsheet) ───────────────────
+
+interface InvestmentEntry {
+  id: string
+  resultadoFiscal: string  // string so the input is controlled; parsed on submit
+  retenciones: string
+}
+
+function makeEntry(): InvestmentEntry {
+  return { id: crypto.randomUUID(), resultadoFiscal: '', retenciones: '' }
+}
+
+// ─── Labels ─────────────────────────────────────────────────────────────────
 
 const REGION_LABELS: Record<SpanishRegion, string> = {
   andalusia: 'Andalucía',
@@ -28,6 +44,8 @@ const REGION_LABELS: Record<SpanishRegion, string> = {
 
 const REGIONS = Object.entries(REGION_LABELS) as [SpanishRegion, string][]
 
+// ─── Formatters ─────────────────────────────────────────────────────────────
+
 function fmt(n: number) {
   return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
 }
@@ -41,7 +59,7 @@ function fmtPct(n: number, decimals = 2) {
   )
 }
 
-// ─── Explanation row ────────────────────────────────────────────────────────
+// ─── Explanation row ─────────────────────────────────────────────────────────
 
 type RowAccent = 'neutral' | 'saving' | 'paid' | 'refund' | 'due'
 
@@ -120,63 +138,172 @@ function Section({
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function RentaAnual({ onResult }: RentaAnualProps) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [files, setFiles] = useState<File[]>([])
-  const [isDragging, setIsDragging] = useState(false)
+  const nominaRef = useRef<HTMLInputElement>(null)
+
+  // Nómina inputs
+  const [nominaFiles, setNominaFiles] = useState<File[]>([])
+  const [isDraggingNomina, setIsDraggingNomina] = useState(false)
+
+  // Personal data
   const [region, setRegion] = useState<SpanishRegion>('madrid')
   const [age, setAge] = useState(35)
   const [civilStatus, setCivilStatus] = useState<CivilStatus>('single')
   const [fiscalYear, setFiscalYear] = useState(2025)
+
+  // Investment / savings income (replaces broker file upload)
+  const [showInvestments, setShowInvestments] = useState(false)
+  const [investmentEntries, setInvestmentEntries] = useState<InvestmentEntry[]>([makeEntry()])
+  const [dividends, setDividends] = useState('')
+  const [dividendWithholdings, setDividendWithholdings] = useState('')
+  const [interestIncome, setInterestIncome] = useState('')
+  const [interestWithholdings, setInterestWithholdings] = useState('')
+
+  // State
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rentaResult, setRentaResult] = useState<RentaAnualResult | null>(null)
+  const [taxResult, setTaxResult] = useState<TaxResult | null>(null)
 
-  // ── File helpers ──────────────────────────────────────────────────────────
+  // Parsed investment totals (stored after submit so results can display them)
+  const [submittedSavings, setSubmittedSavings] = useState<{
+    capitalGains: number
+    dividends: number
+    interest: number
+    savingsWithholdings: number
+  } | null>(null)
 
-  function addFiles(list: FileList | File[] | null) {
+  // ── Nómina file helpers ───────────────────────────────────────────────────
+
+  function addNominaFiles(list: FileList | File[] | null) {
     if (!list) return
     const pdfs = Array.from(list).filter(
       (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
     )
-    setFiles((prev) => {
+    setNominaFiles((prev) => {
       const existing = new Set(prev.map((f) => f.name))
       const fresh = pdfs.filter((f) => !existing.has(f.name))
       return [...prev, ...fresh].slice(0, 12)
     })
   }
 
-  function removeFile(idx: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== idx))
+  function removeNominaFile(idx: number) {
+    setNominaFiles((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  // ── Drag & drop ───────────────────────────────────────────────────────────
+  // ── Investment entry helpers ──────────────────────────────────────────────
 
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault()
-    setIsDragging(true)
+  function addEntry() {
+    setInvestmentEntries((prev) => [...prev, makeEntry()])
   }
-  function onDragLeave(e: React.DragEvent) {
-    // Only clear when leaving the drop zone itself (not a child element)
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false)
+
+  function removeEntry(id: string) {
+    setInvestmentEntries((prev) => prev.filter((e) => e.id !== id))
   }
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setIsDragging(false)
-    addFiles(e.dataTransfer.files)
+
+  function updateEntry(id: string, field: keyof Omit<InvestmentEntry, 'id'>, value: string): void {
+    setInvestmentEntries((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
+    )
+  }
+
+  // ── Derived savings totals ────────────────────────────────────────────────
+
+  function parseSavings() {
+    const capitalGains = investmentEntries.reduce(
+      (sum, e) => sum + (parseFloat(e.resultadoFiscal.replace(',', '.')) || 0),
+      0,
+    )
+    const investmentRetenciones = investmentEntries.reduce(
+      (sum, e) => sum + (parseFloat(e.retenciones.replace(',', '.')) || 0),
+      0,
+    )
+    const divAmount = parseFloat(dividends.replace(',', '.')) || 0
+    const divRet = parseFloat(dividendWithholdings.replace(',', '.')) || 0
+    const intAmount = parseFloat(interestIncome.replace(',', '.')) || 0
+    const intRet = parseFloat(interestWithholdings.replace(',', '.')) || 0
+
+    return {
+      capitalGains,
+      dividends: divAmount,
+      interest: intAmount,
+      savingsWithholdings: investmentRetenciones + divRet + intRet,
+    }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (files.length === 0) return
+    if (nominaFiles.length === 0) return
     setLoading(true)
     setError(null)
     setRentaResult(null)
+    setTaxResult(null)
+    setSubmittedSavings(null)
+
     try {
-      const result = await taxai.parseRenta({ pdfs: files, region, age, civilStatus, fiscalYear })
-      setRentaResult(result)
-      if (result.taxResult) onResult(result.taxResult)
+      const rentaRes = await taxai.parseRenta({
+        pdfs: nominaFiles,
+        region,
+        age,
+        civilStatus,
+        fiscalYear,
+      })
+      setRentaResult(rentaRes)
+
+      const grossForEngine =
+        rentaRes.annualBaseIRPF > 0 ? rentaRes.annualBaseIRPF : rentaRes.annualGross
+
+      const savings = showInvestments ? parseSavings() : null
+      const hasSavings =
+        savings !== null &&
+        (savings.capitalGains !== 0 ||
+          savings.dividends > 0 ||
+          savings.interest > 0 ||
+          savings.savingsWithholdings > 0)
+
+      const totalRetenciones =
+        rentaRes.annualRetencionesNomina + (savings?.savingsWithholdings ?? 0)
+
+      if (hasSavings && savings && grossForEngine > 0) {
+        const combined = await taxai.calculate({
+          fiscalYear,
+          region,
+          age,
+          civilStatus,
+          grossSalary: grossForEngine,
+          retenciones: totalRetenciones,
+          dependentsUnder25: 0,
+          dependentsOver65: 0,
+          ssContributions: rentaRes.annualSS > 0 ? rentaRes.annualSS : undefined,
+          savingsIncome: {
+            capitalGains: savings.capitalGains !== 0 ? savings.capitalGains : undefined,
+            dividends: savings.dividends > 0 ? savings.dividends : undefined,
+            interest: savings.interest > 0 ? savings.interest : undefined,
+          },
+        })
+        setTaxResult(combined)
+        setSubmittedSavings(savings)
+        onResult(combined)
+      } else if (grossForEngine > 0) {
+        // Salary-only calculation
+        const salaryResult = await taxai.calculate({
+          fiscalYear,
+          region,
+          age,
+          civilStatus,
+          grossSalary: grossForEngine,
+          retenciones: rentaRes.annualRetencionesNomina,
+          dependentsUnder25: 0,
+          dependentsOver65: 0,
+          ssContributions: rentaRes.annualSS > 0 ? rentaRes.annualSS : undefined,
+        })
+        setTaxResult(salaryResult)
+        onResult(salaryResult)
+      } else if (rentaRes.taxResult) {
+        setTaxResult(rentaRes.taxResult)
+        onResult(rentaRes.taxResult)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
@@ -184,11 +311,9 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
     }
   }
 
-  // ── Derived fiscal values ─────────────────────────────────────────────────
+  // ── Derived display values ────────────────────────────────────────────────
 
-  const taxResult = rentaResult?.taxResult
   const ssDeductions = rentaResult?.annualSS ?? 0
-  // totalDeductions = SS + trabajo reduction (derived from engine output)
   const totalDeductions = taxResult
     ? Math.max(0, taxResult.grossSalary - taxResult.rendimientoNetoReducido)
     : 0
@@ -201,17 +326,32 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
     rentaResult &&
     rentaResult.annualBaseIRPF > 0 &&
     rentaResult.annualGross > rentaResult.annualBaseIRPF + 0.01
-  const comp = rentaResult?.comparison
   const monthsCount = rentaResult?.months.length ?? 0
+  const hasInvestments =
+    submittedSavings !== null &&
+    (submittedSavings.capitalGains !== 0 ||
+      submittedSavings.dividends > 0 ||
+      submittedSavings.interest > 0)
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Total retenciones used in the calculation (for display in result section)
+  const totalRetencionesPaid =
+    (rentaResult?.annualRetencionesNomina ?? 0) + (submittedSavings?.savingsWithholdings ?? 0)
+
+  // ── Styles ────────────────────────────────────────────────────────────────
 
   const inputCls =
     'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors'
 
+  const loadingLabel = loading
+    ? `Analizando ${nominaFiles.length} nómina${nominaFiles.length !== 1 ? 's' : ''}…`
+    : `Calcular Renta ${fiscalYear}`
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-5">
-      {/* ── Upload form ─────────────────────────────────────────────────── */}
+
+      {/* ── Unified form ─────────────────────────────────────────────────── */}
       <form
         onSubmit={handleSubmit}
         className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5"
@@ -219,81 +359,303 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
         <div>
           <h2 className="font-semibold text-gray-900 text-base">Calcula tu Renta anual</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Sube las nóminas de todos los meses del año. El cálculo usará los datos reales de cada
-            nómina sin proyecciones.
+            Sube tus nóminas del año para calcular tu declaración. Si tienes ganancias por fondos,
+            acciones, ETFs, criptomonedas u otros activos, activa la sección de inversiones.
           </p>
         </div>
 
-        {/* Drop zone */}
-        <div
-          className={`relative border-2 border-dashed rounded-xl p-7 text-center cursor-pointer select-none transition-all ${
-            isDragging
-              ? 'border-blue-400 bg-blue-50 scale-[1.01]'
-              : files.length > 0
-              ? 'border-blue-300 bg-blue-50/40'
-              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-          }`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          aria-label="Seleccionar o arrastrar nóminas PDF"
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,application/pdf"
-            multiple
-            className="hidden"
-            onChange={(e) => addFiles(e.target.files)}
-          />
-          <div className="text-3xl mb-2">{isDragging ? '📂' : files.length > 0 ? '📑' : '📂'}</div>
-          <p className="text-sm font-medium text-gray-700">
-            {isDragging
-              ? 'Suelta aquí tus nóminas'
-              : files.length > 0
-              ? `${files.length} nómina${files.length !== 1 ? 's' : ''} cargada${files.length !== 1 ? 's' : ''} · haz clic para añadir más`
-              : 'Arrastra tus nóminas aquí o haz clic para seleccionar'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Hasta 12 archivos PDF · 10 MB por archivo
-          </p>
-        </div>
-
-        {/* File pills */}
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {files.map((f, i) => (
-              <span
-                key={`${f.name}-${i}`}
-                className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full pl-3 pr-1.5 py-1 text-xs font-medium max-w-[220px]"
-              >
-                <span className="truncate">{f.name}</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeFile(i)
-                  }}
-                  className="flex-shrink-0 w-4 h-4 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center transition-colors leading-none text-blue-700 font-bold"
-                  aria-label={`Eliminar ${f.name}`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {files.length < 12 && (
-              <span className="text-xs text-gray-400 self-center">
-                {12 - files.length} más disponibles
-              </span>
-            )}
+        {/* ── Nóminas drop zone ─────────────────────────────────────────── */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Nóminas del año
+          </label>
+          <div
+            className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer select-none transition-all ${
+              isDraggingNomina
+                ? 'border-blue-400 bg-blue-50 scale-[1.01]'
+                : nominaFiles.length > 0
+                ? 'border-blue-300 bg-blue-50/40'
+                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+            }`}
+            onClick={() => nominaRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingNomina(true) }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDraggingNomina(false)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDraggingNomina(false)
+              addNominaFiles(e.dataTransfer.files)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && nominaRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            aria-label="Seleccionar o arrastrar nóminas PDF"
+          >
+            <input
+              ref={nominaRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => addNominaFiles(e.target.files)}
+            />
+            <div className="text-2xl mb-1.5">
+              {isDraggingNomina ? '📂' : nominaFiles.length > 0 ? '📑' : '📂'}
+            </div>
+            <p className="text-sm font-medium text-gray-700">
+              {isDraggingNomina
+                ? 'Suelta aquí tus nóminas'
+                : nominaFiles.length > 0
+                ? `${nominaFiles.length} nómina${nominaFiles.length !== 1 ? 's' : ''} · haz clic para añadir más`
+                : 'Arrastra tus nóminas aquí o haz clic para seleccionar'}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Hasta 12 PDF · 10 MB por archivo</p>
           </div>
-        )}
 
-        {/* Personal data */}
+          {nominaFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              {nominaFiles.map((f, i) => (
+                <span
+                  key={`${f.name}-${i}`}
+                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full pl-3 pr-1.5 py-1 text-xs font-medium max-w-[220px]"
+                >
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeNominaFile(i) }}
+                    className="flex-shrink-0 w-4 h-4 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center transition-colors leading-none text-blue-700 font-bold"
+                    aria-label={`Eliminar ${f.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {nominaFiles.length < 12 && (
+                <span className="text-xs text-gray-400 self-center">
+                  {12 - nominaFiles.length} más disponibles
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Ganancias patrimoniales (optional) ────────────────────────── */}
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          {/* Toggle header */}
+          <button
+            type="button"
+            onClick={() => setShowInvestments((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">📈</span>
+              <span className="text-sm font-semibold text-gray-800">
+                Ganancias patrimoniales e ingresos del ahorro
+              </span>
+              <span className="text-xs bg-gray-200 text-gray-500 rounded-full px-2 py-0.5 font-medium">
+                Opcional
+              </span>
+            </div>
+            <span className="text-gray-400 text-xs font-medium">
+              {showInvestments ? '▲ Ocultar' : '▼ Mostrar'}
+            </span>
+          </button>
+
+          {showInvestments && (
+            <div className="px-4 py-4 space-y-5 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                Introduce cada venta o reembolso de inversión por separado. El <strong>Resultado fiscal</strong> es
+                la ganancia o pérdida neta (puede ser negativo). Las <strong>Retenciones</strong> son las
+                cantidades que tu broker ya descontó al realizar la operación (Base del ahorro — Art. 46 LIRPF).
+              </p>
+
+              {/* ── Column headers with descriptions ──────────────────── */}
+              <div className="grid grid-cols-[1fr_1fr_32px] gap-2 mb-1">
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Ganancia / Pérdida neta</p>
+                  <p className="text-xs text-gray-400 leading-relaxed mt-0.5">
+                    Importe del campo "Resultado fiscal" en el informe de tu broker. Puede ser
+                    negativo si perdiste dinero.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Retención ya aplicada</p>
+                  <p className="text-xs text-gray-400 leading-relaxed mt-0.5">
+                    Lo que el broker ya descontó automáticamente al vender (campo "Retenciones"
+                    en el informe). Ponlo en 0 si no te retuvieron nada.
+                  </p>
+                </div>
+                <div />
+              </div>
+
+              {/* ── Investment rows ────────────────────────────────────── */}
+              <div className="space-y-2">
+                {investmentEntries.map((entry, idx) => (
+                  <div key={entry.id} className="grid grid-cols-[1fr_1fr_32px] gap-2 items-center">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none select-none">
+                        {idx + 1}.
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ej: 141,18 o −320,00"
+                        value={entry.resultadoFiscal}
+                        onChange={(e) => updateEntry(entry.id, 'resultadoFiscal', e.target.value)}
+                        className={`${inputCls} pl-7`}
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej: 26,82"
+                      value={entry.retenciones}
+                      onChange={(e) => updateEntry(entry.id, 'retenciones', e.target.value)}
+                      className={inputCls}
+                    />
+                    {investmentEntries.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeEntry(entry.id)}
+                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 flex items-center justify-center transition-colors text-base leading-none"
+                        aria-label="Eliminar fila"
+                      >
+                        ×
+                      </button>
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addEntry}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                + Añadir inversión
+              </button>
+
+              {/* ── Dividends ─────────────────────────────────────────── */}
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Dividendos e intereses
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">
+                      Dividendos brutos (€)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={dividends}
+                      onChange={(e) => setDividends(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Art. 25.1 LIRPF — acciones y fondos
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">
+                      Retenciones sobre dividendos (€)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={dividendWithholdings}
+                      onChange={(e) => setDividendWithholdings(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Retenido por el broker (19 % típico)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">
+                      Intereses brutos (€)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={interestIncome}
+                      onChange={(e) => setInterestIncome(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Art. 25.2 LIRPF — cuentas, bonos, p2p
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">
+                      Retenciones sobre intereses (€)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={interestWithholdings}
+                      onChange={(e) => setInterestWithholdings(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Retenido por la entidad financiera
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Live preview of totals ─────────────────────────────── */}
+              {(() => {
+                const preview = parseSavings()
+                const anyValue =
+                  preview.capitalGains !== 0 ||
+                  preview.dividends > 0 ||
+                  preview.interest > 0 ||
+                  preview.savingsWithholdings > 0
+                if (!anyValue) return null
+                return (
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <p className="text-indigo-500 font-semibold mb-0.5">Total ganancias</p>
+                      <p className={`font-bold text-sm ${preview.capitalGains < 0 ? 'text-red-600' : 'text-indigo-800'}`}>
+                        {fmt(preview.capitalGains)}
+                      </p>
+                    </div>
+                    {preview.dividends > 0 && (
+                      <div>
+                        <p className="text-indigo-500 font-semibold mb-0.5">Dividendos</p>
+                        <p className="font-bold text-sm text-indigo-800">{fmt(preview.dividends)}</p>
+                      </div>
+                    )}
+                    {preview.interest > 0 && (
+                      <div>
+                        <p className="text-indigo-500 font-semibold mb-0.5">Intereses</p>
+                        <p className="font-bold text-sm text-indigo-800">{fmt(preview.interest)}</p>
+                      </div>
+                    )}
+                    {preview.savingsWithholdings > 0 && (
+                      <div>
+                        <p className="text-indigo-500 font-semibold mb-0.5">Retenciones del ahorro</p>
+                        <p className="font-bold text-sm text-indigo-800">
+                          {fmt(preview.savingsWithholdings)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* ── Personal data ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(
             [
@@ -371,12 +733,13 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
 
         <button
           type="submit"
-          disabled={files.length === 0 || loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 px-4 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          disabled={nominaFiles.length === 0 || loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 px-4 rounded-xl font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center justify-center gap-2"
         >
-          {loading
-            ? `Analizando ${files.length} nómina${files.length !== 1 ? 's' : ''}…`
-            : `Calcular Renta ${fiscalYear}`}
+          {loading && (
+            <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          )}
+          {loadingLabel}
         </button>
 
         {error && (
@@ -390,34 +753,47 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
       {rentaResult && taxResult && (
         <div className="space-y-4">
 
+          {/* Download button */}
+          <div className="flex justify-end">
+            <DownloadPDFButton
+              pdfDocument={<RentaAnualPDF rentaResult={rentaResult} />}
+              filename={`taxai-renta-${fiscalYear}-${region}.pdf`}
+            />
+          </div>
+
           {/* Hero card */}
           <div
             className={`rounded-2xl p-6 text-white shadow-md ${
-              comp?.diffType === 'overpaid'
+              taxResult.resultType === 'a_devolver'
                 ? 'bg-gradient-to-br from-blue-600 to-blue-700'
-                : comp?.diffType === 'underpaid'
+                : taxResult.resultType === 'a_ingresar'
                 ? 'bg-gradient-to-br from-amber-500 to-orange-600'
                 : 'bg-gradient-to-br from-emerald-600 to-teal-700'
             }`}
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-white/70 mb-1">
-              {comp?.diffType === 'overpaid'
+              {taxResult.resultType === 'a_devolver'
                 ? 'A devolver'
-                : comp?.diffType === 'underpaid'
+                : taxResult.resultType === 'a_ingresar'
                 ? 'A ingresar'
                 : 'Resultado'}{' '}
               · Renta {fiscalYear}
             </p>
             <p className="text-5xl font-bold tracking-tight leading-none">
-              {comp ? fmt(Math.abs(comp.difference)) : fmt(Math.abs(taxResult.resultAmount))}
+              {fmt(Math.abs(taxResult.resultAmount))}
             </p>
             <p className="text-sm text-white/80 mt-2">
-              {comp?.diffType === 'overpaid' &&
+              {taxResult.resultType === 'a_devolver' &&
                 'Hacienda te devolverá esta cantidad al presentar la declaración'}
-              {comp?.diffType === 'underpaid' &&
+              {taxResult.resultType === 'a_ingresar' &&
                 'Deberás pagar esta cantidad al presentar la declaración'}
-              {(!comp || comp.diffType === 'correct') &&
+              {taxResult.resultType === 'cero' &&
                 'Tu declaración está equilibrada — retenciones y cuota coinciden'}
+              {hasInvestments && (
+                <span className="block mt-1 text-white/70">
+                  Incluye salario como empleado/a + ingresos de inversiones
+                </span>
+              )}
             </p>
 
             {/* KPI chips */}
@@ -428,12 +804,14 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
               <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-semibold">
                 {monthsCount} nómina{monthsCount !== 1 ? 's' : ''} procesada{monthsCount !== 1 ? 's' : ''}
               </span>
-              <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-semibold">
-                SS pagada {fmt(ssDeductions)}
-              </span>
-              {comp && (
+              {ssDeductions > 0 && (
                 <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-semibold">
-                  Desviación {fmtPct(comp.percentageDiff, 1)}
+                  SS pagada {fmt(ssDeductions)}
+                </span>
+              )}
+              {hasInvestments && (
+                <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-semibold">
+                  + ingresos de inversiones
                 </span>
               )}
             </div>
@@ -507,7 +885,9 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
                       <td className="px-4 py-3 text-right">
                         {rentaResult.annualBaseIRPF > 0 ? fmt(rentaResult.annualBaseIRPF) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">{fmt(rentaResult.annualRetencionesNomina)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {fmt(rentaResult.annualRetencionesNomina)}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         {rentaResult.annualGross > 0 ? (
                           <span className="inline-block bg-gray-200 text-gray-700 rounded-full px-2.5 py-0.5 text-xs font-semibold">
@@ -527,7 +907,85 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
             </div>
           )}
 
-          {/* ── Fiscal breakdown ─────────────────────────────────────────── */}
+          {/* Investment summary — only shown when savings data was included */}
+          {hasInvestments && submittedSavings && (
+            <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-indigo-100 bg-indigo-50/40">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📈</span>
+                  <h3 className="font-semibold text-gray-900">Ingresos del ahorro incluidos</h3>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Base del ahorro (Art. 46 LIRPF) — ya incluida en el resultado de arriba
+                </p>
+              </div>
+              <div className="px-5 py-4 space-y-2.5">
+                {submittedSavings.capitalGains !== 0 && (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm text-gray-700">Ganancias / pérdidas patrimoniales</p>
+                      <p className="text-xs text-gray-400">
+                        Suma de los resultados fiscales introducidos — Art. 33 LIRPF
+                      </p>
+                    </div>
+                    <span
+                      className={`font-semibold text-sm ${
+                        submittedSavings.capitalGains < 0 ? 'text-red-600' : 'text-emerald-600'
+                      }`}
+                    >
+                      {fmt(submittedSavings.capitalGains)}
+                    </span>
+                  </div>
+                )}
+                {submittedSavings.dividends > 0 && (
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-700">Dividendos</p>
+                    <span className="font-semibold text-sm text-gray-900">
+                      {fmt(submittedSavings.dividends)}
+                    </span>
+                  </div>
+                )}
+                {submittedSavings.interest > 0 && (
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-700">Intereses</p>
+                    <span className="font-semibold text-sm text-gray-900">
+                      {fmt(submittedSavings.interest)}
+                    </span>
+                  </div>
+                )}
+                {submittedSavings.savingsWithholdings > 0 && (
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <div>
+                      <p className="text-sm text-gray-700">Retenciones del ahorro ya pagadas</p>
+                      <p className="text-xs text-gray-400">
+                        Descontadas del resultado final junto con las retenciones de nómina
+                      </p>
+                    </div>
+                    <span className="font-semibold text-sm text-blue-600">
+                      {fmt(submittedSavings.savingsWithholdings)}
+                    </span>
+                  </div>
+                )}
+                {taxResult.baseImponibleAhorro > 0 && (
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">
+                        Base imponible del ahorro
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Tipos: 19% hasta 6.000 €, 21% hasta 50.000 €, 23% hasta 200.000 €…
+                      </p>
+                    </div>
+                    <span className="font-semibold text-sm text-gray-900">
+                      {fmt(taxResult.baseImponibleAhorro)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Fiscal breakdown ──────────────────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Gastos deducibles */}
@@ -538,7 +996,8 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
             >
               {hasExemptBenefits && (
                 <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-                  Tu nómina incluye conceptos exentos de IRPF (p.ej. tickets restaurante, seguro médico) que reducen la base IRPF respecto al total devengado.
+                  Tu nómina incluye conceptos exentos de IRPF (p.ej. tickets restaurante, seguro
+                  médico) que reducen la base IRPF respecto al total devengado.
                 </div>
               )}
               <Row
@@ -591,6 +1050,13 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
                 hint="El rendimiento neto sobre el que se aplican los tramos del IRPF. Si no tienes otras rentas (dividendos, alquileres…) coincide con el rendimiento neto reducido."
                 amount={taxResult.baseImponibleGeneral}
               />
+              {taxResult.baseImponibleAhorro > 0 && (
+                <Row
+                  label="Base imponible del ahorro"
+                  hint="Ganancias patrimoniales, dividendos e intereses tributan aquí a tipos especiales (19–28%), separados de la base general (Art. 46 LIRPF)."
+                  amount={taxResult.baseImponibleAhorro}
+                />
+              )}
               <Row
                 label="Mínimo personal y familiar"
                 hint="La parte de tu renta que no tributa porque la ley considera que es imprescindible para vivir. Para 2025: 5.550 € base, más suplementos si tienes más de 65 años, hijos u otros dependientes (Art. 57–61 LIRPF). Este mínimo se aplica a los tramos más bajos."
@@ -609,16 +1075,19 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
                 amount={taxResult.cuotaLiquidaTOTAL}
                 isTotal
               />
-              {/* State vs regional split */}
               <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <p className="text-xs text-gray-500 mb-1">Cuota estatal</p>
-                  <p className="text-sm font-semibold text-gray-800">{fmt(taxResult.cuotaLiquidaEstatal)}</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {fmt(taxResult.cuotaLiquidaEstatal)}
+                  </p>
                   <p className="text-xs text-gray-400 mt-0.5">Tramos del Estado</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <p className="text-xs text-gray-500 mb-1">Cuota autonómica</p>
-                  <p className="text-sm font-semibold text-gray-800">{fmt(taxResult.cuotaLiquidaAutonomica)}</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {fmt(taxResult.cuotaLiquidaAutonomica)}
+                  </p>
                   <p className="text-xs text-gray-400 mt-0.5">Tramos de {REGION_LABELS[region]}</p>
                 </div>
               </div>
@@ -629,47 +1098,82 @@ export function RentaAnual({ onResult }: RentaAnualProps) {
           <Section
             icon="🧾"
             title="Resultado de la declaración"
-            subtitle="Comparación entre lo que ya has pagado vía retenciones y lo que realmente te corresponde"
+            subtitle={
+              hasInvestments
+                ? 'Cuota total sobre salario + inversiones, comparada con el total de retenciones'
+                : 'Comparación entre lo que ya has pagado vía retenciones y lo que realmente te corresponde'
+            }
           >
+            {hasInvestments && taxResult.baseImponibleAhorro > 0 && (
+              <div className="mb-3 px-3 py-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-800 space-y-1">
+                <p className="font-semibold">¿Por qué puede haber una cantidad a ingresar?</p>
+                <p>
+                  Las retenciones de tus nóminas solo cubren el IRPF de tu salario. Los ingresos de
+                  inversiones (ganancias, dividendos, intereses) tributan en la{' '}
+                  <strong>base del ahorro</strong>. Si el broker no retuvo lo suficiente, la
+                  diferencia se liquida al presentar la declaración.
+                </p>
+                <div className="pt-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
+                  <span className="text-indigo-600">Base general (salario)</span>
+                  <span className="font-semibold text-right">
+                    {fmt(taxResult.baseImponibleGeneral)}
+                  </span>
+                  <span className="text-indigo-600">Base del ahorro (inversiones)</span>
+                  <span className="font-semibold text-right">
+                    {fmt(taxResult.baseImponibleAhorro)}
+                  </span>
+                </div>
+              </div>
+            )}
             <Row
               label="Impuesto que te corresponde (cuota líquida)"
-              hint="El IRPF que legalmente debes pagar por tu renta de este año, calculado por el motor fiscal según las tablas oficiales de la AEAT."
+              hint={
+                hasInvestments
+                  ? 'Suma de la cuota sobre tu salario (base general) y la cuota sobre tus inversiones (base del ahorro), según tablas AEAT.'
+                  : 'El IRPF que legalmente debes pagar por tu renta de este año, calculado por el motor fiscal según las tablas oficiales de la AEAT.'
+              }
               amount={taxResult.cuotaLiquidaTOTAL}
             />
             <Row
-              label="Retenciones ya pagadas durante el año"
-              hint="Lo que tu empresa ha ido ingresando a Hacienda en tu nombre con cada nómina. Este dinero ya está pagado: si es mayor que tu cuota, Hacienda te lo devuelve; si es menor, pagas la diferencia."
-              amount={rentaResult.annualRetencionesNomina}
+              label={
+                hasInvestments
+                  ? 'Retenciones totales ya pagadas (nóminas + ahorro)'
+                  : 'Retenciones ya pagadas durante el año'
+              }
+              hint={
+                hasInvestments
+                  ? `Retenciones de nómina (${fmt(rentaResult.annualRetencionesNomina)}) más las retenciones del broker sobre inversiones (${fmt(submittedSavings?.savingsWithholdings ?? 0)}).`
+                  : 'Lo que tu empresa ha ido ingresando a Hacienda en tu nombre con cada nómina. Este dinero ya está pagado: si es mayor que tu cuota, Hacienda te lo devuelve; si es menor, pagas la diferencia.'
+              }
+              amount={totalRetencionesPaid}
               deduction
               accent="paid"
             />
-            {comp && (
-              <Row
-                label={
-                  comp.diffType === 'overpaid'
-                    ? 'A devolver — Hacienda te debe'
-                    : comp.diffType === 'underpaid'
-                    ? 'A ingresar — debes a Hacienda'
-                    : 'Resultado equilibrado'
-                }
-                hint={
-                  comp.diffType === 'overpaid'
-                    ? `Has pagado ${fmt(Math.abs(comp.difference))} más de lo que te corresponde. Hacienda te ingresará esta cantidad tras presentar la declaración.`
-                    : comp.diffType === 'underpaid'
-                    ? `Tus retenciones no cubren todo el impuesto. Deberás abonar ${fmt(Math.abs(comp.difference))} al presentar la declaración.`
-                    : 'Las retenciones cubren exactamente el impuesto calculado. La declaración no generará cargo ni devolución.'
-                }
-                amount={Math.abs(comp.difference)}
-                isTotal
-                accent={
-                  comp.diffType === 'overpaid'
-                    ? 'refund'
-                    : comp.diffType === 'underpaid'
-                    ? 'due'
-                    : 'neutral'
-                }
-              />
-            )}
+            <Row
+              label={
+                taxResult.resultType === 'a_devolver'
+                  ? 'A devolver — Hacienda te debe'
+                  : taxResult.resultType === 'a_ingresar'
+                  ? 'A ingresar — debes a Hacienda'
+                  : 'Resultado equilibrado'
+              }
+              hint={
+                taxResult.resultType === 'a_devolver'
+                  ? `Has pagado ${fmt(Math.abs(taxResult.resultAmount))} más de lo que te corresponde. Hacienda te ingresará esta cantidad tras presentar la declaración.`
+                  : taxResult.resultType === 'a_ingresar'
+                  ? `Tus retenciones no cubren todo el impuesto. Deberás abonar ${fmt(Math.abs(taxResult.resultAmount))} al presentar la declaración.`
+                  : 'Las retenciones cubren exactamente el impuesto calculado. La declaración no generará cargo ni devolución.'
+              }
+              amount={Math.abs(taxResult.resultAmount)}
+              isTotal
+              accent={
+                taxResult.resultType === 'a_devolver'
+                  ? 'refund'
+                  : taxResult.resultType === 'a_ingresar'
+                  ? 'due'
+                  : 'neutral'
+              }
+            />
 
             {/* Useful stats footer */}
             <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 gap-3">

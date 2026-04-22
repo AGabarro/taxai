@@ -1,4 +1,4 @@
-import type { TaxInput, TaxResult, NominaParseResult, RentaAnualResult, SpanishRegion, CivilStatus } from '@taxai/shared'
+import type { TaxInput, TaxResult, NominaParseResult, RentaAnualResult, BrokerParseResult, SpanishRegion, CivilStatus } from '@taxai/shared'
 import { getApiKey } from '../utils/apiKey'
 
 // Empty string = relative URLs (same origin). Works for both production (Fastify serves everything)
@@ -39,6 +39,14 @@ export interface RentaUploadOptions {
   fiscalYear?: number
 }
 
+export interface BrokerUploadOptions {
+  file: File
+  region?: SpanishRegion
+  age?: number
+  civilStatus?: CivilStatus
+  fiscalYear?: number
+}
+
 async function parseNomina(opts: NominaUploadOptions): Promise<NominaParseResult> {
   const form = new FormData()
   form.append('pdf', opts.pdf)
@@ -71,10 +79,27 @@ async function parseRenta(opts: RentaUploadOptions): Promise<RentaAnualResult> {
   return res.json() as Promise<RentaAnualResult>
 }
 
+async function parseBrokerReport(opts: BrokerUploadOptions): Promise<BrokerParseResult> {
+  const form = new FormData()
+  form.append('file', opts.file)
+  if (opts.region) form.append('region', opts.region)
+  if (opts.age !== undefined) form.append('age', String(opts.age))
+  if (opts.civilStatus) form.append('civilStatus', opts.civilStatus)
+  if (opts.fiscalYear !== undefined) form.append('fiscalYear', String(opts.fiscalYear))
+
+  const res = await fetch(`${BASE}/api/parse-broker`, { method: 'POST', headers: apiKeyHeader(), body: form })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string; message?: string }
+    throw new Error(err.error ?? err.message ?? 'Error al procesar el informe de broker.')
+  }
+  return res.json() as Promise<BrokerParseResult>
+}
+
 export const taxai = {
   calculate: (input: TaxInput) => post<TaxResult>('/api/calculate', input),
   explain: (result: TaxResult, question: string) =>
     post<{ explanation: string }>('/api/explain', { result, question }),
   parseNomina,
   parseRenta,
+  parseBrokerReport,
 }

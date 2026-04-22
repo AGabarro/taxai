@@ -14,5 +14,14 @@
     "baseReduction": 2000,
     "phaseOutStart": 14852,
     "phaseOutEnd": 19747
+  },
+  "rentDeduction": {
+    "rate": 0.15,
+    "capGeneral": 450,
+    "capEnhanced": 450,
+    "incomeCeilingIndividual": 12500,
+    "incomeCeilingJoint": 25000,
+    "enhancedConditions": [],
+    "notes": "Requires under 36. Very low income ceiling."
   }
 }

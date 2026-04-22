@@ -17,5 +17,14 @@
     "phaseOutSegment2End": 19747.50,
     "phaseOutRate2": 1.14,
     "segment2BaseReduction": 2364.34
+  },
+  "rentDeduction": {
+    "rate": 0.15,
+    "capGeneral": 500,
+    "capEnhanced": 500,
+    "incomeCeilingIndividual": 19000,
+    "incomeCeilingJoint": 24000,
+    "enhancedConditions": ["under36", "disability", "largefamily"],
+    "notes": "Disability must be ≥ 33%. Also applies to domestic violence victims."
   }
 }

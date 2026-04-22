@@ -17,5 +17,6 @@
     "phaseOutSegment2End": 19747.50,
     "phaseOutRate2": 1.14,
     "segment2BaseReduction": 2364.34
-  }
+  },
+  "rentDeduction": null
 }

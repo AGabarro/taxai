@@ -1,3 +1,107 @@
+/** Tenant rent payments for habitual residence deduction (varies by autonomía). */
+export interface RentPayments {
+  /** Total rent paid during the fiscal year, in euros */
+  annualRentPaid: number;
+  /** Tenant age < 36 at year end */
+  isUnder36: boolean;
+  /** Disability certificate ≥ 33% */
+  hasDisability: boolean;
+  /** Familia numerosa (3+ children) */
+  isLargeFamily: boolean;
+  /** Unemployed for ≥ 183 days (Catalonia enhanced tier) */
+  isUnemployed6Months: boolean;
+  /** State transitoria (DT 15ª LIRPF, pre-2015 contract) */
+  contractBefore2015: boolean;
+}
+
+/** A single investment transaction extracted from a broker annual report. */
+export interface StockTransaction {
+  /** Ticker or ISIN */
+  assetId: string;
+  assetName?: string;
+  transactionType: 'buy' | 'sell' | 'dividend' | 'interest' | 'fee';
+  /** ISO date "2025-03-15" */
+  date: string;
+  /** Number of shares (undefined for dividends/interest/fees) */
+  quantity?: number;
+  /** Price per share in EUR */
+  pricePerUnit?: number;
+  /** EUR, positive=proceeds/income, negative=cost paid */
+  totalAmount: number;
+  /** EUR, always positive */
+  fees: number;
+  /** "EUR", "USD", etc. */
+  currency: string;
+  /** Exchange rate to EUR on transaction date */
+  fxRate?: number;
+  /** For dividends: foreign tax already paid */
+  foreignTaxWithheld?: number;
+}
+
+/** Raw data extracted by AI from a broker annual report PDF or CSV. */
+export interface BrokerReportData {
+  brokerName?: string;
+  fiscalYear: number;
+  currency: string;
+  transactions: StockTransaction[];
+  /** Broker-reported summaries (for cross-check only — engine recalculates) */
+  reportedCapitalGains?: number;
+  reportedDividends?: number;
+  reportedInterest?: number;
+  reportedFees?: number;
+}
+
+/** Full result returned by POST /api/parse-broker */
+export interface BrokerParseResult {
+  brokerReport: BrokerReportData;
+  /** Engine FIFO result in euros (can be negative) */
+  computedCapitalGains: number;
+  computedDividends: number;
+  computedInterest: number;
+  totalForeignTaxWithheld: number;
+  /** Ready to merge into savingsIncome in TaxInput */
+  taxInput: Partial<TaxInput>;
+  taxResult?: TaxResult;
+  /** e.g. "3 transactions in USD converted at ECB rate" */
+  warnings: string[];
+}
+
+/** Income from savings (Base Imponible del Ahorro — Art. 46 LIRPF). */
+export interface SavingsIncome {
+  /** Net capital gains/losses from stocks, funds, crypto (already offset within the same bucket).
+   *  Can be negative: losses up to 25% of (dividends + interest) can be offset in the same year. */
+  capitalGains?: number;
+  /** Dividend income from shares, investment funds */
+  dividends?: number;
+  /** Interest income from bank accounts, bonds */
+  interest?: number;
+}
+
+/** Real-estate income (Rendimientos del Capital Inmobiliario — Art. 22–24 LIRPF). */
+export interface RentalIncome {
+  /** Total gross rental income received during the year */
+  grossRentalIncome?: number;
+  /** Deductible expenses: mortgage interest, IBI, community fees, repairs, amortisation */
+  rentalExpenses?: number;
+  /** Renta imputada from second homes / empty properties.
+   *  The user calculates this (1.1% × valor catastral for post-1994 review; 2% otherwise). */
+  imputedIncome?: number;
+}
+
+/** Catalonia-specific autonómica deductions (applied to cuota líquida autonómica). */
+export interface CataloniaDeductions {
+  /** Number of 1st or 2nd children born or adopted during the tax year → €300/child */
+  birthAdoptionFirst?: number;
+  /** Number of 3rd+ children born or adopted during the tax year → €600/child */
+  birthAdoptionThird?: number;
+  /** Monthly rent paid for habitual residence (qualifies if age ≤ 32 or ≥ 3 dependents) → 10%, max €300/year */
+  habitatgeRentMonthly?: number;
+  /** Donations to Catalan universities / research entities → 25% deduction */
+  donacionsRecerca?: number;
+  /** Donations to Catalan environmental / ecological entities → 15% deduction */
+  donacionsEcologiques?: number;
+}
+
 export interface TaxInput {
   fiscalYear: number;           // e.g. 2024
   region: SpanishRegion;        // see type below
@@ -7,13 +111,35 @@ export interface TaxInput {
    *  Includes Contingencias Comunes, MEI, Desempleo, and Formación Profesional.
    *  Subtracted from grossSalary before the Art. 20 trabajo reduction is applied. */
   ssContributions?: number;
-  otherIncome?: number;         // rendimientos del capital, etc.
+  otherIncome?: number;         // other rendimientos going into base general (catch-all)
   retenciones: number;          // withholdings already paid
   dependentsUnder25: number;    // children under 25 in household
   dependentsUnder3?: number;    // subset of above who are under 3 (for supplement)
   dependentsOver65: number;     // elderly dependents
   civilStatus: CivilStatus;
-  disability?: DisabilityGrade; // 33% or 65%+
+  disability?: DisabilityGrade; // taxpayer disability grade (33% or 65%+)
+
+  // ── Advanced income / deductions ──────────────────────────────────────────
+
+  /** Savings base income (Base Imponible del Ahorro — Art. 46 LIRPF).
+   *  Capital gains, dividends, interest. Loss compensation up to 25% applied automatically. */
+  savingsIncome?: SavingsIncome;
+  /** Real-estate income (Rendimientos del Capital Inmobiliario — Art. 22–24 LIRPF).
+   *  Net figure (gross − expenses) is added to Base Imponible General. */
+  rentalIncome?: RentalIncome;
+  /** Private pension plan contributions, reducción en Base Imponible General.
+   *  Maximum: €1,500/year (individual limit since 2022, Art. 51 LIRPF). */
+  pensionContributions?: number;
+  /** Region-specific deductions applied to cuota líquida autonómica. */
+  regionalDeductions?: {
+    catalonia?: CataloniaDeductions;
+  };
+  /** Tenant rent payments for the habitual-residence deduction (varies by autonomía). */
+  rentPayments?: RentPayments;
+  /** Number of dependents (children or ascendants) with recognised disability ≥ 33% and < 65% */
+  dependentsDisability33?: number;
+  /** Number of dependents with recognised disability ≥ 65% */
+  dependentsDisability65?: number;
 }
 
 export type SpanishRegion =
@@ -44,25 +170,38 @@ export interface TaxResult {
   region: SpanishRegion;
   grossSalary: number;
 
-  // Reductions applied
-  rendimientoNetoReducido: number;   // after trabajo reductions
-  baseImponibleGeneral: number;
-  minimumPersonalFamiliar: number;
+  // Reductions applied to base general
+  rendimientoNetoReducido: number;   // after SS + trabajo reductions
+  reduccionPension: number;          // pension contribution reduction (€0 if none)
+  netRentalIncome: number;           // net rental income added to base general (€0 if none)
+  baseImponibleGeneral: number;      // rendimientoNetoReducido + otherIncome + netRentalIncome − pensionReduction
+  minimumPersonalFamiliar: number;   // mínimo personal y familiar (Art. 57–61)
 
-  // Split between state and regional
+  // Savings base (Base Imponible del Ahorro — Art. 46 LIRPF)
+  baseImponibleAhorro: number;           // €0 if no savings income
+  cuotaIntegraAhorroEstatal: number;
+  cuotaIntegraAhorroAutonomica: number;
+  cuotaLiquidaAhorroEstatal: number;
+  cuotaLiquidaAhorroAutonomica: number;
+
+  // General base — split between state and regional
   cuotaIntegraEstatal: number;
   cuotaIntegraAutonomica: number;
-  cuotaIntegraTOTAL: number;
+  cuotaIntegraTOTAL: number;             // general + ahorro, both halves
 
-  // Applied to minimum
+  // Cuota líquida — after mínimo, 2025 deduction, regional deductions
   cuotaLiquidaEstatal: number;
   cuotaLiquidaAutonomica: number;
-  cuotaLiquidaTOTAL: number;
+  deduccionesAutonomicas: number;        // regional deductions applied (€0 if none)
+  cuotaLiquidaTOTAL: number;             // general + ahorro − deduccionesAutonomicas
 
   // Final result
   retenciones: number;
   resultAmount: number;       // positive = to pay (a ingresar), negative = refund (a devolver)
   resultType: 'a_ingresar' | 'a_devolver' | 'cero';
+
+  /** Tenant rent deduction applied to cuota líquida autonómica (€0 when not applicable) */
+  deduccionAlquiler: number;
 
   // Waterfall data for the chart (ordered)
   waterfallSteps: WaterfallStep[];

@@ -30,19 +30,33 @@ interface BreakdownRowProps {
   hint?: string
   amount: number
   accent?: boolean
+  negative?: boolean   // force green colouring (reductions)
+  separator?: boolean  // draw a thicker top border
 }
 
-function BreakdownRow({ label, hint, amount, accent }: BreakdownRowProps) {
+function BreakdownRow({ label, hint, amount, accent, negative, separator }: BreakdownRowProps) {
+  const amountColor = accent
+    ? 'text-blue-700'
+    : negative
+    ? 'text-emerald-600'
+    : 'text-gray-900'
   return (
-    <div className="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0 gap-4">
+    <div className={`flex justify-between items-center py-2.5 gap-4 ${separator ? 'border-t-2 border-gray-200 mt-1' : 'border-b border-gray-100 last:border-0'}`}>
       <div className="min-w-0">
         <p className="text-sm text-gray-700 truncate">{label}</p>
         {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
       </div>
-      <span className={`font-mono text-sm font-semibold shrink-0 ${accent ? 'text-blue-700' : 'text-gray-900'}`}>
+      <span className={`font-mono text-sm font-semibold shrink-0 ${amountColor}`}>
         {fmt(amount)}
       </span>
     </div>
+  )
+}
+
+interface SectionHeaderProps { title: string }
+function SectionHeader({ title }: SectionHeaderProps) {
+  return (
+    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-3 pb-1">{title}</p>
   )
 }
 
@@ -52,8 +66,16 @@ interface ResultDashboardProps {
 
 export function ResultDashboard({ result }: ResultDashboardProps) {
   const isDevolver = result.resultType === 'a_devolver'
-  const isCero = result.resultType === 'cero'
-  const absAmount = Math.abs(result.resultAmount)
+  const isCero     = result.resultType === 'cero'
+  const absAmount  = Math.abs(result.resultAmount)
+
+  const hasAhorro          = result.baseImponibleAhorro > 0
+  const hasPension         = result.reduccionPension > 0
+  const hasRental          = result.netRentalIncome > 0
+  const hasRegionalDeducs  = result.deduccionesAutonomicas > 0
+
+  const cuotaLiquidaGeneral = result.cuotaLiquidaEstatal + result.cuotaLiquidaAutonomica
+  const cuotaLiquidaAhorro  = result.cuotaLiquidaAhorroEstatal + result.cuotaLiquidaAhorroAutonomica
 
   const effectiveRate = result.grossSalary > 0
     ? (result.cuotaLiquidaTOTAL / result.grossSalary) * 100
@@ -66,7 +88,7 @@ export function ResultDashboard({ result }: ResultDashboardProps) {
     : 'from-rose-500 to-red-600'
 
   const heroLabel = isDevolver ? 'A devolver' : isCero ? 'Resultado cero' : 'A ingresar'
-  const heroIcon = isDevolver ? '↩' : isCero ? '=' : '→'
+  const heroIcon  = isDevolver ? '↩' : isCero ? '=' : '→'
 
   return (
     <div className="w-full space-y-4">
@@ -102,15 +124,19 @@ export function ResultDashboard({ result }: ResultDashboardProps) {
         </div>
       </div>
 
-      {/* Breakdown grid */}
+      {/* Desglose completo */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 bg-gray-50/80 border-b border-gray-100">
           <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
             Desglose de la declaración
           </h2>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-gray-100">
-          <div className="px-5 py-1">
+
+          {/* ── Left column: bases imponibles ───────────────────────────── */}
+          <div className="px-5 py-2">
+            <SectionHeader title="Base General" />
             <BreakdownRow
               label="Salario bruto"
               hint="Rendimiento íntegro del trabajo"
@@ -121,21 +147,94 @@ export function ResultDashboard({ result }: ResultDashboardProps) {
               hint="Tras deducir SS + reducción por trabajo"
               amount={result.rendimientoNetoReducido}
             />
+            {hasRental && (
+              <BreakdownRow
+                label="Rendimientos capital inmobiliario"
+                hint="Ingresos alquiler netos + renta imputada"
+                amount={result.netRentalIncome}
+              />
+            )}
+            {hasPension && (
+              <BreakdownRow
+                label="Reducción plan de pensiones"
+                hint="Art. 51 LIRPF · máx. €1.500"
+                amount={-result.reduccionPension}
+                negative
+              />
+            )}
+            <BreakdownRow
+              label="Base imponible general"
+              hint="Tramos progresivos (9,5%–24,5% + autonómico)"
+              amount={result.baseImponibleGeneral}
+              accent
+            />
             <BreakdownRow
               label="Mínimo personal y familiar"
               hint="Exención base (Art. 57–61 LIRPF)"
               amount={result.minimumPersonalFamiliar}
             />
+
+            {hasAhorro && (
+              <>
+                <SectionHeader title="Base del Ahorro" />
+                <BreakdownRow
+                  label="Base imponible del ahorro"
+                  hint="Tramos fijos: 19% · 21% · 23% · 26% · 28%"
+                  amount={result.baseImponibleAhorro}
+                  accent
+                />
+              </>
+            )}
           </div>
-          <div className="px-5 py-1 border-t md:border-t-0 border-gray-100">
+
+          {/* ── Right column: cuotas ─────────────────────────────────────── */}
+          <div className="px-5 py-2 border-t md:border-t-0 border-gray-100">
+            <SectionHeader title="Cuota Base General" />
             <BreakdownRow
-              label="Cuota íntegra total"
-              hint="Antes de aplicar el mínimo"
-              amount={result.cuotaIntegraTOTAL}
+              label="Cuota íntegra estatal"
+              hint="Tarifa estatal sobre base general"
+              amount={result.cuotaIntegraEstatal}
             />
             <BreakdownRow
+              label="Cuota íntegra autonómica"
+              hint="Tarifa autonómica sobre base general"
+              amount={result.cuotaIntegraAutonomica}
+            />
+            <BreakdownRow
+              label="Cuota líquida base general"
+              hint="Tras mínimo personal y deducciones"
+              amount={cuotaLiquidaGeneral}
+            />
+
+            {hasAhorro && (
+              <>
+                <SectionHeader title="Cuota Base del Ahorro" />
+                <BreakdownRow
+                  label="Cuota íntegra ahorro (estatal)"
+                  amount={result.cuotaIntegraAhorroEstatal}
+                />
+                <BreakdownRow
+                  label="Cuota íntegra ahorro (autonómica)"
+                  amount={result.cuotaIntegraAhorroAutonomica}
+                />
+                <BreakdownRow
+                  label="Cuota líquida base del ahorro"
+                  amount={cuotaLiquidaAhorro}
+                />
+              </>
+            )}
+
+            <SectionHeader title="Resultado Final" />
+            {hasRegionalDeducs && (
+              <BreakdownRow
+                label="Deducciones autonómicas"
+                amount={-result.deduccionesAutonomicas}
+                negative
+              />
+            )}
+            <BreakdownRow
               label="Cuota líquida total"
-              hint="Lo que realmente debes al fisco"
+              hint={hasAhorro ? 'General + ahorro − deducciones autonómicas' : 'Lo que realmente debes al fisco'}
               amount={result.cuotaLiquidaTOTAL}
               accent
             />
@@ -144,7 +243,15 @@ export function ResultDashboard({ result }: ResultDashboardProps) {
               hint="Ya pagado por tu empresa"
               amount={result.retenciones}
             />
+            <BreakdownRow
+              label={isDevolver ? 'A devolver' : isCero ? 'Resultado' : 'A ingresar'}
+              hint={isDevolver ? 'La AEAT te devuelve este importe' : isCero ? 'Ni pagas ni devuelven' : 'Debes abonar este importe'}
+              amount={result.resultAmount}
+              accent
+              separator
+            />
           </div>
+
         </div>
       </div>
     </div>

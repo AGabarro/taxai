@@ -14,5 +14,6 @@
     "baseReduction": 2000,
     "phaseOutStart": 14852,
     "phaseOutEnd": 19747
-  }
+  },
+  "rentDeduction": null
 }

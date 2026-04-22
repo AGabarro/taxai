@@ -18,5 +18,14 @@
     "baseReduction": 2000,
     "phaseOutStart": 14852,
     "phaseOutEnd": 19747
+  },
+  "rentDeduction": {
+    "rate": 0.10,
+    "capGeneral": 300,
+    "capEnhanced": 600,
+    "incomeCeilingIndividual": 19000,
+    "incomeCeilingJoint": 24000,
+    "enhancedConditions": ["largefamily", "disability"],
+    "notes": "Requires under 36 OR over 65 OR disability ≥ 65%."
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { TaxResult } from '@taxai/shared'
 import { ResultDashboard } from './components/ResultDashboard'
 import { WaterfallChart } from './components/WaterfallChart'
@@ -8,6 +8,8 @@ import { ExplanationPanel } from './components/ExplanationPanel'
 import { NominaUpload } from './components/NominaUpload'
 import { RentaAnual } from './components/RentaAnual'
 import { ApiKeyBanner } from './components/ApiKeyBanner'
+import { DownloadPDFButton } from './components/DownloadPDFButton'
+import { TaxResultPDF } from './pdf/TaxResultPDF'
 
 type InputTab = 'form' | 'nomina' | 'renta'
 
@@ -18,12 +20,19 @@ const TABS: { id: InputTab; label: string; description: string }[] = [
 ]
 
 export default function App() {
-  const [result, setResult] = useState<TaxResult | null>(null)
+  const [results, setResults] = useState<Partial<Record<InputTab, TaxResult>>>({})
   const [activeTab, setActiveTab] = useState<InputTab>('form')
+
+  const result = results[activeTab] ?? null
+
+  // Stable, tab-specific setters — each component always writes to its own slot
+  // regardless of which tab is currently visible.
+  const setFormResult   = useCallback((r: TaxResult | null) => setResults(p => ({ ...p, form:   r ?? undefined })), [])
+  const setNominaResult = useCallback((r: TaxResult | null) => setResults(p => ({ ...p, nomina: r ?? undefined })), [])
+  const setRentaResult  = useCallback((r: TaxResult | null) => setResults(p => ({ ...p, renta:  r ?? undefined })), [])
 
   function switchTab(tab: InputTab) {
     setActiveTab(tab)
-    setResult(null)
   }
 
   return (
@@ -67,14 +76,26 @@ export default function App() {
             ))}
           </nav>
 
-          {activeTab === 'form'   && <InputForm onResult={setResult} />}
-          {activeTab === 'nomina' && <NominaUpload onResult={setResult} />}
-          {activeTab === 'renta'  && <RentaAnual onResult={setResult} />}
+          {/* All three panels stay mounted so in-flight requests and local
+              state (file selection, loading spinner) survive tab switches.
+              Only the active panel is visible. */}
+          <div className={activeTab === 'form'   ? '' : 'hidden'}><InputForm    onResult={setFormResult}   /></div>
+          <div className={activeTab === 'nomina' ? '' : 'hidden'}><NominaUpload onResult={setNominaResult} /></div>
+          <div className={activeTab === 'renta'  ? '' : 'hidden'}><RentaAnual   onResult={setRentaResult}  /></div>
         </section>
 
         {/* ── Results (form + renta tabs only) ──────────────────────────── */}
         {result ? (
           <section className="space-y-4" aria-label="Resultados de la declaración">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                Resultados
+              </h2>
+              <DownloadPDFButton
+                pdfDocument={<TaxResultPDF result={result} />}
+                filename={`taxai-irpf-${result.fiscalYear}-${result.region}.pdf`}
+              />
+            </div>
             <ResultDashboard result={result} />
             <TaxBreakdownCharts result={result} />
             <WaterfallChart steps={result.waterfallSteps} />

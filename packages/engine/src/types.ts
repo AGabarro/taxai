@@ -20,11 +20,22 @@ export interface TrabajoReductions {
   segment2BaseReduction?: number;  // euros — base reduction at start of segment 2
 }
 
+export interface RentDeductionRule {
+  rate: number;
+  capGeneral: number;
+  capEnhanced: number;
+  incomeCeilingIndividual: number;
+  incomeCeilingJoint: number;
+  enhancedConditions: string[];
+  notes?: string;
+}
+
 export interface RegionRules {
   region: string;
   fiscalYear: number;
   autonomicBrackets: Bracket[];
   trabajoReductions: TrabajoReductions;
+  rentDeduction?: RentDeductionRule | null;
 }
 
 export interface StateRules {

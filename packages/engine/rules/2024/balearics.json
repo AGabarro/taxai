@@ -18,5 +18,14 @@
     "baseReduction": 2000,
     "phaseOutStart": 14852,
     "phaseOutEnd": 19747
+  },
+  "rentDeduction": {
+    "rate": 0.15,
+    "capGeneral": 531,
+    "capEnhanced": 663,
+    "incomeCeilingIndividual": 32500,
+    "incomeCeilingJoint": 52800,
+    "enhancedConditions": ["under36", "disability", "largefamily"],
+    "notes": "Deposit must be lodged with official housing authority."
   }
 }

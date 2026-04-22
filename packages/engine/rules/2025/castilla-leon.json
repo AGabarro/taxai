@@ -17,5 +17,14 @@
     "phaseOutSegment2End": 19747.50,
     "phaseOutRate2": 1.14,
     "segment2BaseReduction": 2364.34
+  },
+  "rentDeduction": {
+    "rate": 0.15,
+    "capGeneral": 459,
+    "capEnhanced": 918,
+    "incomeCeilingIndividual": 18900,
+    "incomeCeilingJoint": 31500,
+    "enhancedConditions": ["largefamily", "disability"],
+    "notes": "Requires under 36 OR disability ≥ 65% OR over 65."
   }
 }

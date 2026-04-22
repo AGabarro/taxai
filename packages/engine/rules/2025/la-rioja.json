@@ -20,5 +20,14 @@
     "phaseOutSegment2End": 19747.50,
     "phaseOutRate2": 1.14,
     "segment2BaseReduction": 2364.34
+  },
+  "rentDeduction": {
+    "rate": 0.10,
+    "capGeneral": 300,
+    "capEnhanced": 300,
+    "incomeCeilingIndividual": 18030,
+    "incomeCeilingJoint": 18030,
+    "enhancedConditions": [],
+    "notes": "Requires under 36."
   }
 }

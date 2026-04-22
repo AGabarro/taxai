@@ -19,5 +19,14 @@
     "phaseOutSegment2End": 19747.50,
     "phaseOutRate2": 1.14,
     "segment2BaseReduction": 2364.34
+  },
+  "rentDeduction": {
+    "rate": 0.20,
+    "capGeneral": 600,
+    "capEnhanced": 1200,
+    "incomeCeilingIndividual": 24000,
+    "incomeCeilingJoint": 43000,
+    "enhancedConditions": ["largefamily"],
+    "notes": "Enhanced cap €1200 for large family. Requires under 35 or at-risk family."
   }
 }

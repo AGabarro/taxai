@@ -23,6 +23,7 @@ const bodySchema = {
     region:            { type: 'string', enum: VALID_REGIONS },
     age:               { type: 'integer', minimum: 0, maximum: 120 },
     grossSalary:       { type: 'number', minimum: 0 },
+    ssContributions:   { type: 'number', minimum: 0 },
     otherIncome:       { type: 'number', minimum: 0 },
     retenciones:       { type: 'number', minimum: 0 },
     dependentsUnder25: { type: 'integer', minimum: 0 },
@@ -30,6 +31,57 @@ const bodySchema = {
     dependentsOver65:  { type: 'integer', minimum: 0 },
     civilStatus:       { type: 'string', enum: VALID_CIVIL_STATUS },
     disability:        { type: 'integer', enum: [33, 65] },
+    dependentsDisability33: { type: 'integer', minimum: 0 },
+    dependentsDisability65: { type: 'integer', minimum: 0 },
+    pensionContributions: { type: 'number', minimum: 0 },
+    savingsIncome: {
+      type: 'object',
+      properties: {
+        capitalGains: { type: 'number' },
+        dividends:    { type: 'number', minimum: 0 },
+        interest:     { type: 'number', minimum: 0 },
+      },
+      additionalProperties: false,
+    },
+    rentalIncome: {
+      type: 'object',
+      properties: {
+        grossRentalIncome: { type: 'number', minimum: 0 },
+        rentalExpenses:    { type: 'number', minimum: 0 },
+        imputedIncome:     { type: 'number', minimum: 0 },
+      },
+      additionalProperties: false,
+    },
+    regionalDeductions: {
+      type: 'object',
+      properties: {
+        catalonia: {
+          type: 'object',
+          properties: {
+            birthAdoptionFirst:    { type: 'integer', minimum: 0 },
+            birthAdoptionThird:    { type: 'integer', minimum: 0 },
+            habitatgeRentMonthly:  { type: 'number', minimum: 0 },
+            donacionsRecerca:      { type: 'number', minimum: 0 },
+            donacionsEcologiques:  { type: 'number', minimum: 0 },
+          },
+          additionalProperties: false,
+        },
+      },
+      additionalProperties: false,
+    },
+    rentPayments: {
+      type: 'object',
+      properties: {
+        annualRentPaid:        { type: 'number', minimum: 0 },
+        isUnder36:             { type: 'boolean' },
+        hasDisability:         { type: 'boolean' },
+        isLargeFamily:         { type: 'boolean' },
+        isUnemployed6Months:   { type: 'boolean' },
+        contractBefore2015:    { type: 'boolean' },
+      },
+      required: ['annualRentPaid', 'isUnder36', 'hasDisability', 'isLargeFamily', 'isUnemployed6Months', 'contractBefore2015'],
+      additionalProperties: false,
+    },
   },
   additionalProperties: false,
 } as const;

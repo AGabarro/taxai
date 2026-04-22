@@ -314,7 +314,7 @@ export async function parseNominaRoute(app: FastifyInstance): Promise<void> {
           }
         } catch (err) {
           // Calculation failure is non-fatal — return what we have
-          app.log.warn('Engine calculation failed for nomina parse:', err);
+          app.log.warn({ err }, 'Engine calculation failed for nomina parse');
         }
       }
 

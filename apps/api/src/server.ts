@@ -9,6 +9,7 @@ import { extractRoute } from './routes/extract.js';
 import { explainRoute } from './routes/explain.js';
 import { parseNominaRoute } from './routes/parse-nomina.js';
 import { parseRentaRoute } from './routes/parse-renta.js';
+import { parseBrokerRoute } from './routes/parse-broker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Resolves to apps/web/dist from apps/api/src/
@@ -28,6 +29,7 @@ await app.register(extractRoute);
 await app.register(explainRoute);
 await app.register(parseNominaRoute);
 await app.register(parseRentaRoute);
+await app.register(parseBrokerRoute);
 
 // Serve the built React app
 try {

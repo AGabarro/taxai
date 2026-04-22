@@ -18,5 +18,14 @@
     "baseReduction": 2000,
     "phaseOutStart": 14852,
     "phaseOutEnd": 19747
+  },
+  "rentDeduction": {
+    "rate": 0.10,
+    "capGeneral": 300,
+    "capEnhanced": 600,
+    "incomeCeilingIndividual": 20000,
+    "incomeCeilingJoint": 30000,
+    "enhancedConditions": ["under36", "disability", "largefamily", "unemployed6m"],
+    "notes": "under36 means age ≤ 32 in Catalonia. Deposit must be lodged with INCASÒL."
   }
 }
